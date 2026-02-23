@@ -1,0 +1,87 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String         @id @default(cuid())
+  name          String?
+  email         String         @unique
+  password      String?
+  role          String         @default("USER") // ADMIN | USER
+  createdAt     DateTime       @default(now())
+  accounts      Account[]
+  sessions      Session[]
+  schedules     WorkSchedule[] @relation("CreatedSchedules")
+  assignedProjects ExcelProject[] @relation("AssignedProjects")
+  createdProjects  ExcelProject[] @relation("CreatedProjects")
+  activityLogs  ActivityLog[]
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model WorkSchedule {
+  id        String  @id @default(cuid())
+  dayOfWeek Int     // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+  startTime String  // HH:mm format
+  endTime   String  // HH:mm format
+  isActive  Boolean @default(true)
+  createdBy String
+  creator   User    @relation("CreatedSchedules", fields: [createdBy], references: [id])
+
+  @@unique([dayOfWeek])
+}
+
+model ExcelProject {
+  id           String   @id @default(cuid())
+  name         String
+  description  String?
+  fileName     String
+  fileData     Bytes
+  assignedToId String?
+  createdById  String
+  status       String   @default("PENDING") // PENDING | IN_PROGRESS | COMPLETED
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  assignedTo User? @relation("AssignedProjects", fields: [assignedToId], references: [id])
+  createdBy  User  @relation("CreatedProjects", fields: [createdById], references: [id])
+}
+
+model ActivityLog {
+  id        String   @id @default(cuid())
+  userId    String
+  action    String   // LOGIN | LOGOUT | FILE_UPLOAD | FILE_EDIT | FILE_DOWNLOAD
+  details   String?
+  timestamp DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id])
+}
