@@ -9,7 +9,7 @@ export default async function Home() {
   }
 
   if (session.user.role === "ADMIN") {
-    redirect("/admin/schedule");
+    redirect("/admin/dashboard");
   }
 
   redirect("/user/projects");

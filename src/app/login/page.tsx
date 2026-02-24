@@ -186,7 +186,7 @@ export default function AuthPage() {
                 </svg>
               </div>
               <span className="text-white text-xl font-bold tracking-tight">
-                Quant
+                Trumpet Courts
               </span>
             </div>
           </div>
@@ -262,7 +262,7 @@ export default function AuthPage() {
               </svg>
             </div>
             <span className="text-gray-900 text-xl font-bold tracking-tight">
-              Quant
+              Trumpet Courts
             </span>
           </div>
 
@@ -610,7 +610,7 @@ export default function AuthPage() {
 
           {/* Footer */}
           <p className="mt-8 text-center text-xs text-gray-400 animate-fade-in-up stagger-4 opacity-0">
-            By continuing, you agree to Quant&apos;s terms of use and
+            By continuing, you agree to Trumpet Courts&apos; terms of use and
             acknowledge that your access is governed by admin-configured work
             schedules.
           </p>

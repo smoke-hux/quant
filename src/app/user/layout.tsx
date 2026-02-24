@@ -82,8 +82,11 @@ export default function UserLayout({
 
   if (status === "loading") {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-gray-500">Loading...</div>
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="flex flex-col items-center gap-3">
+          <div className="spinner" />
+          <p className="text-sm text-gray-400 font-medium">Loading workspace...</p>
+        </div>
       </div>
     );
   }
@@ -92,8 +95,9 @@ export default function UserLayout({
     <div className="flex min-h-screen">
       <Sidebar
         links={userLinks}
-        title="User Dashboard"
+        title="Workspace"
         userEmail={session?.user?.email}
+        userName={session?.user?.name}
       />
       <div className="flex-1 flex flex-col">
         {scheduleInfo?.todaySchedule?.isActive && (
@@ -102,7 +106,7 @@ export default function UserLayout({
             {scheduleInfo.todaySchedule.endTime}
           </div>
         )}
-        <main className="flex-1 p-8 bg-gray-50">{children}</main>
+        <main className="flex-1 p-8 bg-gray-50 page-enter">{children}</main>
       </div>
     </div>
   );

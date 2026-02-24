@@ -3,7 +3,7 @@ import "./globals.css";
 import { SessionProvider } from "@/components/session-provider";
 
 export const metadata: Metadata = {
-  title: "Quant - Work Time Management",
+  title: "Trumpet Courts - Work Time Management",
   description: "Work time management and Excel platform",
 };
 
