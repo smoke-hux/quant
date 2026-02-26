@@ -11,16 +11,23 @@ export const GET = withAuth(
 
     const projects = await prisma.excelProject.findMany({
       where,
-      include: {
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        fileName: true,
+        status: true,
+        createdAt: true,
+        updatedAt: true,
+        assignedToId: true,
+        createdById: true,
         assignedTo: { select: { id: true, name: true, email: true } },
         createdBy: { select: { id: true, name: true, email: true } },
       },
       orderBy: { updatedAt: "desc" },
     });
 
-    const projectsWithoutData = projects.map(({ fileData, ...rest }) => rest);
-
-    return NextResponse.json(projectsWithoutData);
+    return NextResponse.json(projects);
   }
 );
 

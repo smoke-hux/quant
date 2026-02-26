@@ -50,6 +50,7 @@ interface DashboardData {
   recentActivity: ActivityLog[];
   activeProjects: ActiveProject[];
   userStatuses: UserStatus[];
+  pendingAccessRequests: number;
 }
 
 const ACTION_COLORS: Record<string, string> = {
@@ -113,7 +114,10 @@ export default function DashboardPage() {
 
   const fetchData = useCallback(() => {
     fetch("/api/admin/dashboard")
-      .then((r) => r.json())
+      .then((r) => {
+        if (!r.ok) throw new Error("Failed to fetch");
+        return r.json();
+      })
       .then((d) => {
         setData(d);
         setLoading(false);
@@ -255,6 +259,39 @@ export default function DashboardPage() {
           </div>
         ))}
       </div>
+
+      {/* Pending Access Requests Banner */}
+      {data.pendingAccessRequests > 0 && (
+        <Link
+          href="/admin/access-requests"
+          className="block mb-6 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-xl px-6 py-4 hover:shadow-md transition-all card-enter hover-lift"
+          style={{ animationDelay: "0.35s" }}
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-amber-100 flex items-center justify-center">
+                <svg className="w-5 h-5 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+                </svg>
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-amber-900">
+                  {data.pendingAccessRequests} pending access {data.pendingAccessRequests === 1 ? "request" : "requests"}
+                </p>
+                <p className="text-xs text-amber-600">
+                  Users are waiting for schedule override approval
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 text-sm font-medium text-amber-700">
+              Review
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+              </svg>
+            </div>
+          </div>
+        </Link>
+      )}
 
       {/* Middle: Activity Feed + Active Projects */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">

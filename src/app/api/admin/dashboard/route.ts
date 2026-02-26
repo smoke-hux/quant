@@ -13,8 +13,8 @@ export const GET = withAuth(
     const todayStart = new Date(now);
     todayStart.setHours(0, 0, 0, 0);
 
-    // Fetch all data in parallel
-    const [users, todayLogs, recentLogs, activeProjects] = await Promise.all([
+    // Fetch all data in parallel (single batch for maximum concurrency)
+    const [users, todayLogs, recentLogs, activeProjects, pendingAccessRequests, sessionLogs, lastActivityLogs] = await Promise.all([
       prisma.user.findMany({
         select: { id: true, name: true, email: true, role: true },
         orderBy: { createdAt: "desc" },
@@ -45,29 +45,27 @@ export const GET = withAuth(
         orderBy: { updatedAt: "desc" },
         take: 20,
       }),
+      prisma.accessRequest.count({
+        where: { status: "PENDING" },
+      }),
+      // Session logs for online detection (LOGIN/LOGOUT in last 2 hours)
+      prisma.activityLog.findMany({
+        where: {
+          action: { in: ["LOGIN", "LOGOUT"] },
+          timestamp: { gte: twoHoursAgo },
+        },
+        orderBy: { timestamp: "desc" },
+        select: { userId: true, action: true, timestamp: true },
+      }),
+      // Last activity per user (any action in last 2 hours)
+      prisma.activityLog.findMany({
+        where: {
+          timestamp: { gte: twoHoursAgo },
+        },
+        orderBy: { timestamp: "desc" },
+        select: { userId: true, timestamp: true },
+      }),
     ]);
-
-    // Get the last LOGIN and LOGOUT per user for online detection
-    const userIds = users.map((u) => u.id);
-    const sessionLogs = await prisma.activityLog.findMany({
-      where: {
-        userId: { in: userIds },
-        action: { in: ["LOGIN", "LOGOUT"] },
-        timestamp: { gte: twoHoursAgo },
-      },
-      orderBy: { timestamp: "desc" },
-      select: { userId: true, action: true, timestamp: true },
-    });
-
-    // Get last activity per user (any action)
-    const lastActivityLogs = await prisma.activityLog.findMany({
-      where: {
-        userId: { in: userIds },
-        timestamp: { gte: twoHoursAgo },
-      },
-      orderBy: { timestamp: "desc" },
-      select: { userId: true, timestamp: true },
-    });
 
     // Build per-user session/activity maps
     const lastLoginMap = new Map<string, Date>();
@@ -160,6 +158,7 @@ export const GET = withAuth(
         updatedAt: p.updatedAt.toISOString(),
       })),
       userStatuses,
+      pendingAccessRequests,
     });
   }
 );

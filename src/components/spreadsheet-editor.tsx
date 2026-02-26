@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect, useRef } from "react";
-import * as XLSX from "xlsx";
+import type * as XLSXType from "xlsx";
 
 interface SpreadsheetEditorProps {
   projectId: string;
@@ -27,16 +27,18 @@ export function SpreadsheetEditor({
   const [activeSheet, setActiveSheet] = useState(0);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [xlsxLoading, setXlsxLoading] = useState(true);
   const [editingCell, setEditingCell] = useState<{
     row: number;
     col: number;
   } | null>(null);
   const [editValue, setEditValue] = useState("");
-  const workbookRef = useRef<XLSX.WorkBook | null>(null);
+  const workbookRef = useRef<XLSXType.WorkBook | null>(null);
+  const xlsxRef = useRef<typeof XLSXType | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const parseWorkbook = useCallback(
-    (wb: XLSX.WorkBook, sheetIndex: number) => {
+    (XLSX: typeof XLSXType, wb: XLSXType.WorkBook, sheetIndex: number) => {
       const sheetName = wb.SheetNames[sheetIndex];
       const sheet = wb.Sheets[sheetName];
       const jsonData = XLSX.utils.sheet_to_json<CellValue[]>(sheet, {
@@ -70,22 +72,27 @@ export function SpreadsheetEditor({
   );
 
   useEffect(() => {
-    const binaryStr = atob(fileDataBase64);
-    const bytes = new Uint8Array(binaryStr.length);
-    for (let i = 0; i < binaryStr.length; i++) {
-      bytes[i] = binaryStr.charCodeAt(i);
-    }
+    import("xlsx").then((XLSX) => {
+      xlsxRef.current = XLSX;
 
-    const wb = XLSX.read(bytes, { type: "array" });
-    workbookRef.current = wb;
-    setSheetNames(wb.SheetNames);
-    parseWorkbook(wb, 0);
+      const binaryStr = atob(fileDataBase64);
+      const bytes = new Uint8Array(binaryStr.length);
+      for (let i = 0; i < binaryStr.length; i++) {
+        bytes[i] = binaryStr.charCodeAt(i);
+      }
+
+      const wb = XLSX.read(bytes, { type: "array" });
+      workbookRef.current = wb;
+      setSheetNames(wb.SheetNames);
+      parseWorkbook(XLSX, wb, 0);
+      setXlsxLoading(false);
+    });
   }, [fileDataBase64, parseWorkbook]);
 
   function switchSheet(index: number) {
     setActiveSheet(index);
-    if (workbookRef.current) {
-      parseWorkbook(workbookRef.current, index);
+    if (workbookRef.current && xlsxRef.current) {
+      parseWorkbook(xlsxRef.current, workbookRef.current, index);
     }
   }
 
@@ -138,6 +145,9 @@ export function SpreadsheetEditor({
   }
 
   async function handleSave() {
+    const XLSX = xlsxRef.current;
+    if (!XLSX) return;
+
     setSaving(true);
     try {
       // Build worksheet from data
@@ -169,6 +179,9 @@ export function SpreadsheetEditor({
   }
 
   async function handleDownload() {
+    const XLSX = xlsxRef.current;
+    if (!XLSX) return;
+
     // Log download
     await fetch(`/api/projects/${projectId}`, { method: "PATCH" });
 
@@ -192,33 +205,44 @@ export function SpreadsheetEditor({
     setSaved(false);
   }
 
+  if (xlsxLoading) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="flex flex-col items-center gap-3">
+          <div className="spinner" />
+          <p className="text-sm text-gray-400 font-medium">Loading spreadsheet...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col h-full">
       {/* Toolbar */}
-      <div className="flex items-center justify-between px-4 py-3 bg-white border-b border-gray-200">
-        <div className="flex items-center gap-4">
-          <h2 className="text-lg font-semibold text-gray-900">{projectName}</h2>
-          <span className="text-sm text-gray-500">{fileName}</span>
+      <div className="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2 sm:py-3 bg-white border-b border-gray-200">
+        <div className="flex items-center gap-2 sm:gap-4 min-w-0">
+          <h2 className="text-sm sm:text-lg font-semibold text-gray-900 truncate">{projectName}</h2>
+          <span className="text-xs sm:text-sm text-gray-500 hidden sm:block">{fileName}</span>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 sm:gap-2">
           {!readOnly && (
             <>
               <button
                 onClick={addRow}
-                className="px-3 py-1.5 text-sm text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200"
+                className="px-2.5 sm:px-3 py-2 sm:py-1.5 text-xs sm:text-sm text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 min-h-[40px] sm:min-h-0"
               >
                 + Row
               </button>
               <button
                 onClick={addColumn}
-                className="px-3 py-1.5 text-sm text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200"
+                className="px-2.5 sm:px-3 py-2 sm:py-1.5 text-xs sm:text-sm text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 min-h-[40px] sm:min-h-0"
               >
-                + Column
+                + Col
               </button>
               <button
                 onClick={handleSave}
                 disabled={saving}
-                className="px-4 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                className="px-3 sm:px-4 py-2 sm:py-1.5 text-xs sm:text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 min-h-[40px] sm:min-h-0"
               >
                 {saving ? "Saving..." : saved ? "Saved!" : "Save"}
               </button>
@@ -226,21 +250,22 @@ export function SpreadsheetEditor({
           )}
           <button
             onClick={handleDownload}
-            className="px-4 py-1.5 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
+            className="px-3 sm:px-4 py-2 sm:py-1.5 text-xs sm:text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 min-h-[40px] sm:min-h-0"
           >
-            Download .xlsx
+            <span className="sm:hidden">DL</span>
+            <span className="hidden sm:inline">Download .xlsx</span>
           </button>
         </div>
       </div>
 
       {/* Sheet tabs */}
       {sheetNames.length > 1 && (
-        <div className="flex gap-0 bg-gray-100 border-b border-gray-200 px-4">
+        <div className="flex gap-0 bg-gray-100 border-b border-gray-200 px-4 overflow-x-auto">
           {sheetNames.map((name, i) => (
             <button
               key={name}
               onClick={() => switchSheet(i)}
-              className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+              className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
                 i === activeSheet
                   ? "border-blue-600 text-blue-600 bg-white"
                   : "border-transparent text-gray-500 hover:text-gray-700"
@@ -263,7 +288,7 @@ export function SpreadsheetEditor({
               {headers.map((header) => (
                 <th
                   key={header}
-                  className="bg-gray-100 border border-gray-300 px-2 py-1 text-xs text-gray-500 font-medium min-w-[100px]"
+                  className="bg-gray-100 border border-gray-300 px-2 py-1 text-xs text-gray-500 font-medium min-w-[80px] sm:min-w-[100px]"
                 >
                   {header}
                 </th>
@@ -296,10 +321,10 @@ export function SpreadsheetEditor({
                         onChange={(e) => setEditValue(e.target.value)}
                         onBlur={commitEdit}
                         onKeyDown={handleKeyDown}
-                        className="w-full h-full px-1 py-1 outline-none bg-transparent text-sm"
+                        className="w-full h-full px-1 py-1.5 outline-none bg-transparent text-sm min-h-[36px] sm:min-h-[28px]"
                       />
                     ) : (
-                      <div className="px-1 py-1 min-h-[1.75rem] truncate">
+                      <div className="px-1 py-1.5 sm:py-1 min-h-[36px] sm:min-h-[1.75rem] truncate">
                         {cell !== null && cell !== undefined
                           ? String(cell)
                           : ""}

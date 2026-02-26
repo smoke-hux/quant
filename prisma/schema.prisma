@@ -14,12 +14,15 @@ model User {
   password      String?
   role          String         @default("USER") // ADMIN | USER
   createdAt     DateTime       @default(now())
+  scheduleOverrideUntil DateTime? // Admin-granted schedule bypass, null = no override
   accounts      Account[]
   sessions      Session[]
   schedules     WorkSchedule[] @relation("CreatedSchedules")
   assignedProjects ExcelProject[] @relation("AssignedProjects")
   createdProjects  ExcelProject[] @relation("CreatedProjects")
+  uploadedDocuments ProjectDocument[] @relation("UploadedDocuments")
   activityLogs  ActivityLog[]
+  accessRequests AccessRequest[]
 }
 
 model Account {
@@ -75,6 +78,21 @@ model ExcelProject {
 
   assignedTo User? @relation("AssignedProjects", fields: [assignedToId], references: [id])
   createdBy  User  @relation("CreatedProjects", fields: [createdById], references: [id])
+  documents  ProjectDocument[]
+}
+
+model ProjectDocument {
+  id           String   @id @default(cuid())
+  projectId    String
+  fileName     String
+  fileType     String   // "xlsx","pdf","docx","png","jpg","txt","zip", etc.
+  fileSize     Int      // Size in bytes
+  fileData     Bytes
+  uploadedById String
+  createdAt    DateTime @default(now())
+
+  project    ExcelProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  uploadedBy User         @relation("UploadedDocuments", fields: [uploadedById], references: [id])
 }
 
 model ActivityLog {
@@ -84,4 +102,15 @@ model ActivityLog {
   details   String?
   timestamp DateTime @default(now())
   user      User     @relation(fields: [userId], references: [id])
+}
+
+model AccessRequest {
+  id           String    @id @default(cuid())
+  userId       String
+  message      String?
+  status       String    @default("PENDING") // PENDING | APPROVED | DENIED
+  createdAt    DateTime  @default(now())
+  reviewedAt   DateTime?
+  reviewedById String?
+  user         User      @relation(fields: [userId], references: [id])
 }

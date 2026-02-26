@@ -82,7 +82,7 @@ export default function ActivityPage() {
 
   return (
     <div className="max-w-5xl page-enter">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
         <div>
           <h2 className="text-2xl font-bold text-gray-900">Activity Log</h2>
           <p className="text-gray-500 mt-1">
@@ -107,7 +107,8 @@ export default function ActivityPage() {
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-        <table className="w-full">
+        <div className="overflow-x-auto">
+        <table className="w-full min-w-[600px]">
           <thead>
             <tr className="bg-gray-50/80 border-b border-gray-200">
               <th className="px-6 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
@@ -180,6 +181,7 @@ export default function ActivityPage() {
           </tbody>
         </table>
 
+        </div>
         {totalPages > 1 && (
           <div className="flex items-center justify-between px-6 py-3.5 border-t border-gray-100 bg-gray-50/50">
             <div className="text-sm text-gray-500">

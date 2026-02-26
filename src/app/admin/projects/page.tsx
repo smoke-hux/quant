@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef } from "react";
+import { useSession } from "next-auth/react";
+import { DocumentsPanel } from "@/components/documents-panel";
 
 interface User {
   id: string;
@@ -53,11 +55,13 @@ function SkeletonProjects() {
 }
 
 export default function ProjectsPage() {
+  const { data: session } = useSession();
   const [projects, setProjects] = useState<Project[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [showUpload, setShowUpload] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [expandedProjectId, setExpandedProjectId] = useState<string | null>(null);
   const [uploadForm, setUploadForm] = useState({
     name: "",
     description: "",
@@ -130,7 +134,7 @@ export default function ProjectsPage() {
 
   return (
     <div className="max-w-6xl page-enter">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
         <div>
           <h2 className="text-2xl font-bold text-gray-900">Projects</h2>
           <p className="text-gray-500 mt-1">
@@ -165,7 +169,7 @@ export default function ProjectsPage() {
             Upload New Project
           </h3>
           <form onSubmit={handleUpload} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">
                   Project Name
@@ -254,7 +258,8 @@ export default function ProjectsPage() {
       )}
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-        <table className="w-full">
+        <div className="overflow-x-auto">
+        <table className="w-full min-w-[700px]">
           <thead>
             <tr className="bg-gray-50/80 border-b border-gray-200">
               <th className="px-6 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
@@ -272,13 +277,16 @@ export default function ProjectsPage() {
               <th className="px-6 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
                 Updated
               </th>
+              <th className="px-6 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                Docs
+              </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
             {projects.length === 0 ? (
               <tr>
                 <td
-                  colSpan={5}
+                  colSpan={6}
                   className="px-6 py-12 text-center"
                 >
                   <svg className="w-10 h-10 text-gray-300 mx-auto mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -289,70 +297,99 @@ export default function ProjectsPage() {
               </tr>
             ) : (
               projects.map((project, i) => (
-                <tr
-                  key={project.id}
-                  className="table-row-hover row-enter"
-                  style={{ animationDelay: `${i * 40}ms` }}
-                >
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-green-50 flex items-center justify-center flex-shrink-0">
-                        <svg className="w-4 h-4 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <React.Fragment key={project.id}>
+                  <tr
+                    className="table-row-hover row-enter"
+                    style={{ animationDelay: `${i * 40}ms` }}
+                  >
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-green-50 flex items-center justify-center flex-shrink-0">
+                          <svg className="w-4 h-4 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+                          </svg>
+                        </div>
+                        <div>
+                          <div className="text-sm font-medium text-gray-900">
+                            {project.name}
+                          </div>
+                          {project.description && (
+                            <div className="text-xs text-gray-400 mt-0.5">
+                              {project.description}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {project.fileName}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <select
+                        value={project.assignedTo?.id || ""}
+                        onChange={(e) =>
+                          handleAssign(project.id, e.target.value)
+                        }
+                        className="text-sm border border-gray-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                      >
+                        <option value="">Unassigned</option>
+                        {users.map((user) => (
+                          <option key={user.id} value={user.id}>
+                            {user.name || user.email}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <select
+                        value={project.status}
+                        onChange={(e) =>
+                          handleStatusChange(project.id, e.target.value)
+                        }
+                        className={`text-xs font-semibold rounded-lg px-2.5 py-1.5 border-0 ${statusColors[project.status]}`}
+                      >
+                        <option value="PENDING">Pending</option>
+                        <option value="IN_PROGRESS">In Progress</option>
+                        <option value="COMPLETED">Completed</option>
+                      </select>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400">
+                      {new Date(project.updatedAt).toLocaleString()}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <button
+                        onClick={() => setExpandedProjectId(expandedProjectId === project.id ? null : project.id)}
+                        className={`p-1.5 rounded-lg transition-colors ${
+                          expandedProjectId === project.id
+                            ? "bg-blue-50 text-blue-600"
+                            : "text-gray-400 hover:text-gray-600 hover:bg-gray-50"
+                        }`}
+                        title="View documents"
+                      >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                           <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
                         </svg>
-                      </div>
-                      <div>
-                        <div className="text-sm font-medium text-gray-900">
-                          {project.name}
-                        </div>
-                        {project.description && (
-                          <div className="text-xs text-gray-400 mt-0.5">
-                            {project.description}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {project.fileName}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <select
-                      value={project.assignedTo?.id || ""}
-                      onChange={(e) =>
-                        handleAssign(project.id, e.target.value)
-                      }
-                      className="text-sm border border-gray-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                    >
-                      <option value="">Unassigned</option>
-                      {users.map((user) => (
-                        <option key={user.id} value={user.id}>
-                          {user.name || user.email}
-                        </option>
-                      ))}
-                    </select>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <select
-                      value={project.status}
-                      onChange={(e) =>
-                        handleStatusChange(project.id, e.target.value)
-                      }
-                      className={`text-xs font-semibold rounded-lg px-2.5 py-1.5 border-0 ${statusColors[project.status]}`}
-                    >
-                      <option value="PENDING">Pending</option>
-                      <option value="IN_PROGRESS">In Progress</option>
-                      <option value="COMPLETED">Completed</option>
-                    </select>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400">
-                    {new Date(project.updatedAt).toLocaleString()}
-                  </td>
-                </tr>
+                      </button>
+                    </td>
+                  </tr>
+                  {expandedProjectId === project.id && (
+                    <tr>
+                      <td colSpan={6} className="px-6 py-4 bg-gray-50/50 border-t border-gray-100">
+                        <DocumentsPanel
+                          projectId={project.id}
+                          projectName={project.name}
+                          isAdmin={true}
+                          currentUserId={session?.user?.id}
+                        />
+                      </td>
+                    </tr>
+                  )}
+                </React.Fragment>
               ))
             )}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   );

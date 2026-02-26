@@ -31,9 +31,9 @@ export const updateProjectSchema = z.object({
   status: z.enum(["PENDING", "IN_PROGRESS", "COMPLETED"]).optional(),
 });
 
-// Only allow user-initiated actions — LOGIN/LOGOUT are system-only
+// LOGIN is system-only (logged in signIn callback); LOGOUT is user-initiated (sign-out button)
 export const activityLogSchema = z.object({
-  action: z.enum(["FILE_UPLOAD", "FILE_EDIT", "FILE_DOWNLOAD"]),
+  action: z.enum(["LOGOUT", "FILE_UPLOAD", "FILE_EDIT", "FILE_DOWNLOAD"]),
   details: z.string().max(500).optional(),
 });
 
@@ -55,6 +55,16 @@ const MAX_BASE64_SIZE = 70_000_000; // ~50MB in base64
 export const putProjectSchema = z.object({
   fileData: z.string().max(MAX_BASE64_SIZE, "File data too large").optional(),
   status: z.enum(["PENDING", "IN_PROGRESS", "COMPLETED"]).optional(),
+});
+
+export const accessRequestSchema = z.object({
+  message: z.string().max(500).optional(),
+});
+
+export const reviewAccessRequestSchema = z.object({
+  requestId: z.string().min(1),
+  action: z.enum(["APPROVE", "DENY"]),
+  overrideHours: z.number().min(1).max(72).optional(),
 });
 
 export function validate<T>(

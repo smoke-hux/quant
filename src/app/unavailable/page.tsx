@@ -18,16 +18,66 @@ export default function UnavailablePage() {
   const [schedule, setSchedule] = useState<ScheduleInfo | null>(null);
   const [currentTime, setCurrentTime] = useState(new Date());
 
+  // Access request state
+  const [hasPending, setHasPending] = useState(false);
+  const [message, setMessage] = useState("");
+  const [sending, setSending] = useState(false);
+  const [requestSent, setRequestSent] = useState(false);
+  const [requestError, setRequestError] = useState("");
+
   useEffect(() => {
     fetch("/api/schedule/check")
-      .then((res) => res.json())
-      .then(setSchedule);
+      .then((res) => {
+        if (!res.ok) throw new Error("Failed to fetch");
+        return res.json();
+      })
+      .then(setSchedule)
+      .catch(() => {});
+
+    // Check if user already has a pending request
+    fetch("/api/access-requests")
+      .then((res) => {
+        if (!res.ok) throw new Error("Failed to fetch");
+        return res.json();
+      })
+      .then((data) => {
+        if (data.hasPending) setHasPending(true);
+      })
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
+
+  async function handleRequestAccess(e: React.FormEvent) {
+    e.preventDefault();
+    setSending(true);
+    setRequestError("");
+
+    try {
+      const res = await fetch("/api/access-requests", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: message || undefined }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        setRequestError(data.error || "Failed to send request");
+        setSending(false);
+        return;
+      }
+
+      setRequestSent(true);
+      setHasPending(true);
+      setSending(false);
+    } catch {
+      setRequestError("Something went wrong. Please try again.");
+      setSending(false);
+    }
+  }
 
   const timeStr = currentTime.toLocaleTimeString([], {
     hour: "2-digit",
@@ -112,12 +162,71 @@ export default function UnavailablePage() {
             </div>
           )}
 
-          <button
-            onClick={() => signOut({ callbackUrl: "/login" })}
-            className="w-full px-4 py-2.5 text-sm font-medium text-gray-600 bg-gray-100 rounded-xl hover:bg-gray-200 hover:text-gray-900 transition-all"
-          >
-            Sign Out
-          </button>
+          {/* Request Access Section */}
+          <div className="border-t border-gray-100 pt-6 mt-2">
+            <h3 className="text-sm font-semibold text-gray-900 mb-1">Need access now?</h3>
+            <p className="text-xs text-gray-400 mb-4">
+              Send a request to the admin and they can grant you temporary access.
+            </p>
+
+            {requestSent || hasPending ? (
+              <div className="bg-green-50 rounded-xl px-5 py-4 border border-green-100 animate-fade-in-up">
+                <div className="flex items-center justify-center gap-2 mb-1">
+                  <svg className="w-5 h-5 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <span className="text-sm font-medium text-green-800">Request sent</span>
+                </div>
+                <p className="text-xs text-green-600">
+                  An admin will review your request. You&apos;ll get access once it&apos;s approved.
+                </p>
+              </div>
+            ) : (
+              <form onSubmit={handleRequestAccess} className="space-y-3">
+                <textarea
+                  value={message}
+                  onChange={(e) => setMessage(e.target.value)}
+                  placeholder="Reason for access (optional)"
+                  rows={2}
+                  maxLength={500}
+                  className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 placeholder-gray-400"
+                />
+
+                {requestError && (
+                  <p className="text-xs text-red-600 animate-slide-in">{requestError}</p>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={sending}
+                  className="w-full px-4 py-2.5 bg-blue-600 text-white text-sm font-semibold rounded-xl hover:bg-blue-700 disabled:opacity-50 shadow-sm shadow-blue-200/50 flex items-center justify-center gap-2"
+                >
+                  {sending ? (
+                    <>
+                      <div className="spinner-sm" style={{ borderTopColor: "white", borderColor: "rgba(255,255,255,0.3)" }} />
+                      Sending...
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
+                      </svg>
+                      Request Access
+                    </>
+                  )}
+                </button>
+              </form>
+            )}
+          </div>
+
+          <div className="mt-6">
+            <button
+              onClick={() => signOut({ callbackUrl: "/login" })}
+              className="w-full px-4 py-2.5 text-sm font-medium text-gray-600 bg-gray-100 rounded-xl hover:bg-gray-200 hover:text-gray-900 transition-all"
+            >
+              Sign Out
+            </button>
+          </div>
         </div>
 
         {/* Branding */}

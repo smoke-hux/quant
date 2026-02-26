@@ -34,6 +34,7 @@ export default function UserLayout({
 }) {
   const { data: session, status } = useSession();
   const router = useRouter();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [scheduleInfo, setScheduleInfo] = useState<{
     allowed: boolean;
     todaySchedule?: { startTime: string; endTime: string; isActive: boolean };
@@ -98,15 +99,29 @@ export default function UserLayout({
         title="Workspace"
         userEmail={session?.user?.email}
         userName={session?.user?.name}
+        isOpen={sidebarOpen}
+        onToggle={() => setSidebarOpen(false)}
       />
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col min-w-0">
+        {/* Mobile top bar */}
+        <div className="lg:hidden flex items-center gap-3 px-4 py-3 bg-white border-b border-gray-200 sticky top-0 z-30">
+          <button
+            onClick={() => setSidebarOpen(true)}
+            className="p-2 -ml-1 rounded-lg hover:bg-gray-100"
+          >
+            <svg className="w-5 h-5 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+            </svg>
+          </button>
+          <h1 className="text-sm font-semibold text-gray-900">Trumpet Courts</h1>
+        </div>
         {scheduleInfo?.todaySchedule?.isActive && (
-          <div className="bg-blue-50 border-b border-blue-100 px-6 py-2 text-sm text-blue-700">
+          <div className="bg-blue-50 border-b border-blue-100 px-4 lg:px-6 py-2 text-sm text-blue-700">
             Work hours today: {scheduleInfo.todaySchedule.startTime} –{" "}
             {scheduleInfo.todaySchedule.endTime}
           </div>
         )}
-        <main className="flex-1 p-8 bg-gray-50 page-enter">{children}</main>
+        <main className="flex-1 p-4 lg:p-8 bg-gray-50 page-enter">{children}</main>
       </div>
     </div>
   );
