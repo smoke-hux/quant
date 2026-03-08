@@ -252,7 +252,7 @@ export default function DashboardPage() {
             </span>
             <button
               onClick={fetchData}
-              className="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 hover:border-gray-300 shadow-sm cursor-pointer transition-colors"
+              className="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-gray-600 bg-white/60 backdrop-blur-sm border border-white/40 rounded-lg hover:bg-white/80 hover:border-white/50 shadow-sm cursor-pointer transition-colors"
             >
               <RefreshCw className="w-4 h-4" />
               Refresh
@@ -266,7 +266,7 @@ export default function DashboardPage() {
         {statCards.map((card, i) => (
           <div
             key={card.label}
-            className={`bg-gradient-to-br ${card.gradient} rounded-xl border border-gray-100 p-5 card-enter hover-lift cursor-default`}
+            className={`bg-gradient-to-br ${card.gradient} bg-opacity-60 backdrop-blur-xl rounded-xl border border-white/40 p-5 card-enter hover-lift cursor-default shadow-sm shadow-black/[0.03]`}
             style={{ animationDelay: `${i * 80}ms` }}
           >
             <div className="flex items-center justify-between mb-3">
@@ -296,7 +296,7 @@ export default function DashboardPage() {
       {data.pendingAccessRequests > 0 && (
         <Link
           href="/admin/access-requests"
-          className="block mb-6 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-xl px-6 py-4 hover:shadow-md transition-all card-enter hover-lift cursor-pointer"
+          className="block mb-6 bg-gradient-to-r from-amber-50/70 to-orange-50/70 backdrop-blur-xl border border-amber-200/50 rounded-xl px-6 py-4 hover:shadow-md transition-all card-enter hover-lift cursor-pointer"
           style={{ animationDelay: "0.35s" }}
         >
           <div className="flex items-center justify-between">

@@ -83,7 +83,7 @@ export default function UserLayout({
 
   if (status === "loading") {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="min-h-screen flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
           <div className="spinner" />
           <p className="text-sm text-gray-400 font-medium">Loading workspace...</p>
@@ -104,7 +104,7 @@ export default function UserLayout({
       />
       <div className="flex-1 flex flex-col min-w-0">
         {/* Mobile top bar */}
-        <div className="lg:hidden flex items-center gap-3 px-4 py-3 bg-white border-b border-gray-200 sticky top-0 z-30">
+        <div className="lg:hidden flex items-center gap-3 px-4 py-3 bg-white/60 backdrop-blur-xl border-b border-white/30 sticky top-0 z-30">
           <button
             onClick={() => setSidebarOpen(true)}
             className="p-2 -ml-1 rounded-lg hover:bg-gray-100"
@@ -116,12 +116,12 @@ export default function UserLayout({
           <h1 className="text-sm font-semibold text-gray-900">Trumpet Courts</h1>
         </div>
         {scheduleInfo?.todaySchedule?.isActive && (
-          <div className="bg-blue-50 border-b border-blue-100 px-4 lg:px-6 py-2 text-sm text-blue-700">
+          <div className="bg-blue-50/60 backdrop-blur-sm border-b border-blue-100/40 px-4 lg:px-6 py-2 text-sm text-blue-700">
             Work hours today: {scheduleInfo.todaySchedule.startTime} –{" "}
             {scheduleInfo.todaySchedule.endTime}
           </div>
         )}
-        <main className="flex-1 p-4 lg:p-8 bg-gray-50 page-enter">{children}</main>
+        <main className="flex-1 p-4 lg:p-8 page-enter">{children}</main>
       </div>
     </div>
   );

@@ -8,10 +8,11 @@ export function Card({ variant = "default", className, children, ...props }: Car
   return (
     <div
       className={cn(
-        "rounded-xl border p-6",
-        variant === "default" && "bg-white border-gray-200 shadow-sm",
+        "rounded-xl p-6",
+        variant === "default" &&
+          "bg-white/65 backdrop-blur-xl border border-white/40 shadow-sm shadow-black/[0.04]",
         variant === "glass" &&
-          "bg-white/80 backdrop-blur-sm border-gray-200/60 shadow-sm",
+          "bg-white/50 backdrop-blur-xl border border-white/30 shadow-sm shadow-black/[0.04]",
         className
       )}
       {...props}

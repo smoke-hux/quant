@@ -27,10 +27,10 @@ export function useToast() {
 }
 
 const variantStyles: Record<ToastVariant, { bg: string; icon: typeof CheckCircle2; iconColor: string }> = {
-  success: { bg: "border-green-200 bg-white", icon: CheckCircle2, iconColor: "text-green-500" },
-  error: { bg: "border-red-200 bg-white", icon: AlertCircle, iconColor: "text-red-500" },
-  info: { bg: "border-blue-200 bg-white", icon: Info, iconColor: "text-blue-500" },
-  warning: { bg: "border-amber-200 bg-white", icon: AlertTriangle, iconColor: "text-amber-500" },
+  success: { bg: "border-green-200/60 bg-white/80 backdrop-blur-xl", icon: CheckCircle2, iconColor: "text-green-500" },
+  error: { bg: "border-red-200/60 bg-white/80 backdrop-blur-xl", icon: AlertCircle, iconColor: "text-red-500" },
+  info: { bg: "border-blue-200/60 bg-white/80 backdrop-blur-xl", icon: Info, iconColor: "text-blue-500" },
+  warning: { bg: "border-amber-200/60 bg-white/80 backdrop-blur-xl", icon: AlertTriangle, iconColor: "text-amber-500" },
 };
 
 export function ToastProvider({ children }: { children: React.ReactNode }) {

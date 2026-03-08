@@ -57,7 +57,7 @@ function SkeletonUsers() {
         </div>
         <div className="skeleton h-9 w-24 rounded-lg" />
       </div>
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+      <div className="bg-white/65 backdrop-blur-xl rounded-xl shadow-sm shadow-black/[0.04] border border-white/40 overflow-hidden">
         <div className="p-4 space-y-4">
           {[...Array(5)].map((_, i) => (
             <div key={i} className="flex items-center gap-4">
@@ -335,7 +335,7 @@ export default function UsersPage() {
 
       {/* Create User Form */}
       {showCreate && (
-        <div className="mb-6 p-6 bg-white rounded-xl shadow-sm border border-gray-200 animate-fade-in-up">
+        <div className="mb-6 p-6 bg-white/65 backdrop-blur-xl rounded-xl shadow-sm shadow-black/[0.04] border border-white/40 animate-fade-in-up">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Create New User</h3>
           {createError && (
             <div className="mb-4 px-4 py-3 bg-red-50 border border-red-100 text-red-700 rounded-xl text-sm flex items-center gap-2 animate-slide-in">
@@ -518,7 +518,7 @@ export default function UsersPage() {
       {/* Mobile Card View */}
       <div className="md:hidden space-y-3">
         {filtered.length === 0 ? (
-          <div className="bg-white rounded-xl border border-gray-200 p-8 text-center">
+          <div className="bg-white/65 backdrop-blur-xl rounded-xl border border-white/40 p-8 text-center">
             <Users className="w-10 h-10 text-gray-300 mx-auto mb-3" />
             <p className="text-sm text-gray-400">
               {search ? "No users match your search." : "No users found."}
@@ -528,7 +528,7 @@ export default function UsersPage() {
           filtered.map((user, i) => (
             <div
               key={user.id}
-              className="bg-white rounded-xl border border-gray-200 p-4 card-enter hover-lift"
+              className="bg-white/65 backdrop-blur-xl rounded-xl border border-white/40 p-4 card-enter hover-lift"
               style={{ animationDelay: `${i * 50}ms` }}
             >
               <div className="flex items-start justify-between">

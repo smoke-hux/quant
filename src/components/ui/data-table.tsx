@@ -11,11 +11,11 @@ interface DataTableProps {
 
 export function DataTable({ headers, children, empty, isEmpty, className }: DataTableProps) {
   return (
-    <div className={cn("bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden", className)}>
+    <div className={cn("bg-white/65 backdrop-blur-xl rounded-xl border border-white/40 shadow-sm shadow-black/[0.04] overflow-hidden", className)}>
       <div className="overflow-x-auto">
         <table className="w-full">
           <thead>
-            <tr className="bg-gray-50/80 border-b border-gray-200">
+            <tr className="bg-white/40 border-b border-white/30">
               {headers}
             </tr>
           </thead>

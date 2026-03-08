@@ -83,7 +83,7 @@ export default function ProjectEditorPage() {
   return (
     <div className="h-[calc(100vh-8rem)] -m-4 lg:-m-8 flex flex-col">
       {/* Top bar */}
-      <div className="px-4 py-2 bg-white border-b border-gray-200 flex items-center justify-between">
+      <div className="px-4 py-2 bg-white/60 backdrop-blur-xl border-b border-white/30 flex items-center justify-between">
         <button
           onClick={() => router.push("/user/projects")}
           className="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1"
@@ -138,7 +138,7 @@ export default function ProjectEditorPage() {
               className="absolute inset-0 bg-black/50 lg:hidden"
               onClick={() => setShowDocs(false)}
             />
-            <div className="absolute right-0 top-0 bottom-0 w-80 max-w-full border-l border-gray-200 bg-white overflow-y-auto lg:static lg:w-full">
+            <div className="absolute right-0 top-0 bottom-0 w-80 max-w-full border-l border-white/30 bg-white/70 backdrop-blur-xl overflow-y-auto lg:static lg:w-full">
               <DocumentsPanel
                 projectId={project.id}
                 projectName={project.name}

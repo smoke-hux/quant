@@ -78,7 +78,7 @@ export default function UserProjectsPage() {
       </div>
 
       {projects.length === 0 ? (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-12 text-center card-enter">
+        <div className="bg-white/65 backdrop-blur-xl rounded-xl shadow-sm shadow-black/[0.04] border border-white/40 p-12 text-center card-enter">
           <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
             <svg
               className="w-8 h-8 text-gray-400"
@@ -107,7 +107,7 @@ export default function UserProjectsPage() {
               <Link
                 key={project.id}
                 href={`/user/projects/${project.id}`}
-                className={`block bg-white rounded-xl shadow-sm border border-gray-200 border-l-4 ${config.border} p-6 hover:shadow-md hover:border-gray-300 transition-all card-enter hover-lift`}
+                className={`block bg-white/65 backdrop-blur-xl rounded-xl shadow-sm shadow-black/[0.04] border border-white/40 border-l-4 ${config.border} p-6 hover:shadow-md hover:border-white/50 transition-all card-enter hover-lift`}
                 style={{ animationDelay: `${i * 80}ms` }}
               >
                 <div className="flex items-start justify-between">

@@ -253,7 +253,7 @@ function AuthPageInner() {
       </div>
 
       {/* Right panel - form */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-6 sm:p-12 bg-gray-50">
+      <div className="w-full lg:w-1/2 flex items-center justify-center p-6 sm:p-12 bg-gradient-mesh">
         <div className="w-full max-w-md">
           {/* Mobile logo */}
           <div className="lg:hidden flex items-center gap-3 mb-10 animate-fade-in-up">
@@ -290,12 +290,12 @@ function AuthPageInner() {
           </div>
 
           {/* Tab toggle */}
-          <div className="mt-8 flex bg-gray-100 rounded-xl p-1 animate-fade-in-up stagger-1 opacity-0">
+          <div className="mt-8 flex bg-white/40 backdrop-blur-sm rounded-xl p-1 animate-fade-in-up stagger-1 opacity-0 border border-white/30">
             <button
               onClick={() => switchMode("login")}
               className={`flex-1 py-2.5 text-sm font-medium rounded-lg transition-all duration-200 ${
                 mode === "login"
-                  ? "bg-white text-gray-900 shadow-sm"
+                  ? "bg-white/80 backdrop-blur-sm text-gray-900 shadow-sm"
                   : "text-gray-500 hover:text-gray-700"
               }`}
             >
@@ -305,7 +305,7 @@ function AuthPageInner() {
               onClick={() => switchMode("signup")}
               className={`flex-1 py-2.5 text-sm font-medium rounded-lg transition-all duration-200 ${
                 mode === "signup"
-                  ? "bg-white text-gray-900 shadow-sm"
+                  ? "bg-white/80 backdrop-blur-sm text-gray-900 shadow-sm"
                   : "text-gray-500 hover:text-gray-700"
               }`}
             >
@@ -387,7 +387,7 @@ function AuthPageInner() {
                     required
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    className="block w-full pl-11 pr-4 py-3 bg-white border border-gray-200 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                    className="block w-full pl-11 pr-4 py-3 bg-white/60 backdrop-blur-sm border border-white/40 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                     placeholder="John Doe"
                   />
                 </div>
@@ -423,7 +423,7 @@ function AuthPageInner() {
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="block w-full pl-11 pr-4 py-3 bg-white border border-gray-200 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                  className="block w-full pl-11 pr-4 py-3 bg-white/60 backdrop-blur-sm border border-white/40 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                   placeholder="you@example.com"
                 />
               </div>
@@ -458,7 +458,7 @@ function AuthPageInner() {
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="block w-full pl-11 pr-12 py-3 bg-white border border-gray-200 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                  className="block w-full pl-11 pr-12 py-3 bg-white/60 backdrop-blur-sm border border-white/40 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                   placeholder={
                     mode === "signup" ? "Min. 6 characters" : "Enter password"
                   }
@@ -537,7 +537,7 @@ function AuthPageInner() {
                     required
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
-                    className="block w-full pl-11 pr-4 py-3 bg-white border border-gray-200 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                    className="block w-full pl-11 pr-4 py-3 bg-white/60 backdrop-blur-sm border border-white/40 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                     placeholder="Re-enter password"
                   />
                 </div>
@@ -585,7 +585,7 @@ function AuthPageInner() {
                 <div className="w-full border-t border-gray-200" />
               </div>
               <div className="relative flex justify-center text-xs uppercase">
-                <span className="px-3 bg-gray-50 text-gray-400 font-medium tracking-wider">
+                <span className="px-3 bg-transparent text-gray-400 font-medium tracking-wider">
                   or continue with
                 </span>
               </div>
@@ -595,7 +595,7 @@ function AuthPageInner() {
             <button
               type="button"
               onClick={() => signIn("google", { callbackUrl: "/" })}
-              className="w-full flex items-center justify-center gap-3 py-3 px-4 bg-white border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-all duration-200"
+              className="w-full flex items-center justify-center gap-3 py-3 px-4 bg-white/60 backdrop-blur-sm border border-white/40 rounded-xl text-sm font-medium text-gray-700 hover:bg-white/80 hover:border-white/50 transition-all duration-200"
             >
               <svg className="w-5 h-5" viewBox="0 0 24 24">
                 <path

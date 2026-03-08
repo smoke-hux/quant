@@ -35,7 +35,7 @@ function SkeletonActivity() {
         </div>
         <div className="skeleton h-9 w-36 rounded-lg" />
       </div>
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden p-4 space-y-3">
+      <div className="bg-white/65 backdrop-blur-xl rounded-xl shadow-sm shadow-black/[0.04] border border-white/40 overflow-hidden p-4 space-y-3">
         {[...Array(8)].map((_, i) => (
           <div key={i} className="flex items-center gap-4">
             <div className="skeleton skeleton-avatar" />
@@ -124,7 +124,7 @@ export default function ActivityPage() {
           <button
             onClick={handleExportCSV}
             disabled={logs.length === 0}
-            className="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 hover:border-gray-300 shadow-sm cursor-pointer transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            className="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-gray-600 bg-white/60 backdrop-blur-sm border border-white/40 rounded-lg hover:bg-white/80 hover:border-white/50 shadow-sm cursor-pointer transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <DownloadIcon className="w-4 h-4" />
             Export CSV

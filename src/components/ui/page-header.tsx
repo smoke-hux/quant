@@ -17,7 +17,7 @@ export function PageHeader({ title, description, badge, actions, count }: PageHe
     <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-8">
       <div>
         {badge && (
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-blue-50 text-blue-600 text-xs font-semibold rounded-full mb-3">
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-blue-50/60 backdrop-blur-sm border border-blue-100/40 text-blue-600 text-xs font-semibold rounded-full mb-3">
             {badge.icon && <badge.icon className="w-3.5 h-3.5" />}
             {badge.label}
           </span>
@@ -25,7 +25,7 @@ export function PageHeader({ title, description, badge, actions, count }: PageHe
         <div className="flex items-center gap-3">
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">{title}</h1>
           {count !== undefined && (
-            <span className="px-2.5 py-0.5 bg-gray-100 text-gray-600 text-sm font-semibold rounded-full">
+            <span className="px-2.5 py-0.5 bg-white/50 backdrop-blur-sm border border-white/30 text-gray-600 text-sm font-semibold rounded-full">
               {count}
             </span>
           )}

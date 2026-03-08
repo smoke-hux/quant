@@ -60,7 +60,7 @@ export function Sidebar({ links, title, userEmail, userName, isOpen, onToggle }:
       {/* Sidebar */}
       <div
         className={cn(
-          "flex flex-col w-64 bg-white border-r border-gray-200 min-h-screen z-50",
+          "flex flex-col w-64 bg-white/70 backdrop-blur-xl border-r border-white/30 min-h-screen z-50",
           "fixed lg:static inset-y-0 left-0 transition-transform duration-200 ease-in-out",
           isOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
         )}
@@ -122,8 +122,8 @@ export function Sidebar({ links, title, userEmail, userName, isOpen, onToggle }:
                 className={cn(
                   "group flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 relative",
                   isActive
-                    ? "bg-blue-50 text-blue-700 shadow-sm shadow-blue-100/50"
-                    : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                    ? "bg-blue-500/10 text-blue-700 shadow-sm shadow-blue-100/30 backdrop-blur-sm"
+                    : "text-gray-600 hover:bg-white/50 hover:text-gray-900"
                 )}
               >
                 {/* Active left border indicator */}
@@ -143,7 +143,7 @@ export function Sidebar({ links, title, userEmail, userName, isOpen, onToggle }:
         </nav>
 
         {/* User section */}
-        <div className="p-4 border-t border-gray-100 bg-gray-50/50">
+        <div className="p-4 border-t border-white/20 bg-white/30">
           <div className="flex items-center gap-3 mb-3">
             {/* User avatar */}
             <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center flex-shrink-0 shadow-sm">

@@ -356,9 +356,45 @@ button, a, input, select, textarea {
 
 /* ===== Glass card ===== */
 .glass-card {
-  background: rgba(255, 255, 255, 0.8);
+  background: rgba(255, 255, 255, 0.65);
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+}
+
+/* ===== Glass surface (lighter, for nested elements) ===== */
+.glass-surface {
+  background: rgba(255, 255, 255, 0.5);
+  backdrop-filter: blur(12px) saturate(150%);
+  -webkit-backdrop-filter: blur(12px) saturate(150%);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+/* ===== Glass sidebar ===== */
+.glass-sidebar {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border-right: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+/* ===== Glass input ===== */
+.glass-input {
+  background: rgba(255, 255, 255, 0.6);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+}
+
+/* ===== Gradient mesh background ===== */
+.bg-gradient-mesh {
+  background:
+    radial-gradient(ellipse at 10% 20%, rgba(147, 197, 253, 0.3) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 10%, rgba(196, 181, 253, 0.25) 0%, transparent 50%),
+    radial-gradient(ellipse at 50% 80%, rgba(167, 243, 208, 0.2) 0%, transparent 50%),
+    radial-gradient(ellipse at 90% 70%, rgba(253, 186, 116, 0.15) 0%, transparent 50%),
+    linear-gradient(135deg, #f0f4ff 0%, #faf5ff 25%, #f0fdf4 50%, #fffbeb 75%, #f8fafc 100%);
+  background-attachment: fixed;
 }
 
 /* ===== Reduced motion ===== */

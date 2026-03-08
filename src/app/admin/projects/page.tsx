@@ -54,7 +54,7 @@ function SkeletonProjects() {
         </div>
         <div className="skeleton h-9 w-32 rounded-lg" />
       </div>
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden p-4 space-y-4">
+      <div className="bg-white/65 backdrop-blur-xl rounded-xl shadow-sm shadow-black/[0.04] border border-white/40 overflow-hidden p-4 space-y-4">
         {[...Array(4)].map((_, i) => (
           <div key={i} className="flex items-center gap-4">
             <div className="skeleton h-5 w-40" />
@@ -266,7 +266,7 @@ export default function ProjectsPage() {
 
       {/* Upload Form */}
       {showUpload && (
-        <div className="mb-6 p-6 bg-white rounded-xl shadow-sm border border-gray-200 animate-fade-in-up">
+        <div className="mb-6 p-6 bg-white/65 backdrop-blur-xl rounded-xl shadow-sm shadow-black/[0.04] border border-white/40 animate-fade-in-up">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Upload New Project</h3>
           <form onSubmit={handleUpload} className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -367,7 +367,7 @@ export default function ProjectsPage() {
 
       {/* Bulk Action Bar */}
       {selectedIds.size > 0 && (
-        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-xl flex flex-wrap items-center gap-3 animate-fade-in-up">
+        <div className="mb-4 p-3 bg-blue-50/60 backdrop-blur-sm border border-blue-200/50 rounded-xl flex flex-wrap items-center gap-3 animate-fade-in-up">
           <span className="text-sm font-semibold text-blue-700">
             {selectedIds.size} selected
           </span>

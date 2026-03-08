@@ -85,7 +85,7 @@ function SkeletonStats() {
   return (
     <div className="max-w-5xl page-enter">
       <div className="skeleton h-4 w-28 rounded mb-6" />
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
+      <div className="bg-white/65 backdrop-blur-xl rounded-xl shadow-sm shadow-black/[0.04] border border-white/40 p-6 mb-6">
         <div className="flex items-center gap-4">
           <div className="skeleton w-14 h-14 rounded-full" />
           <div className="flex-1 space-y-2">
@@ -101,7 +101,7 @@ function SkeletonStats() {
         ))}
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <div className="bg-white/65 backdrop-blur-xl rounded-xl shadow-sm shadow-black/[0.04] border border-white/40 overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-200">
             <div className="skeleton skeleton-title w-40" />
           </div>
@@ -111,7 +111,7 @@ function SkeletonStats() {
             ))}
           </div>
         </div>
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <div className="bg-white/65 backdrop-blur-xl rounded-xl shadow-sm shadow-black/[0.04] border border-white/40 overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-200">
             <div className="skeleton skeleton-title w-32" />
           </div>
@@ -222,7 +222,7 @@ export default function UserStatsPage() {
       </Link>
 
       {/* User Info Header */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6 card-enter">
+      <div className="bg-white/65 backdrop-blur-xl rounded-xl shadow-sm shadow-black/[0.04] border border-white/40 p-6 mb-6 card-enter">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-4">
             <Avatar name={user.name} email={user.email} size="lg" />
@@ -340,7 +340,7 @@ export default function UserStatsPage() {
         {statCards.map((stat, i) => (
           <div
             key={stat.label}
-            className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 card-enter group"
+            className="bg-white/65 backdrop-blur-xl rounded-xl shadow-sm shadow-black/[0.04] border border-white/40 p-5 card-enter group"
             style={{ animationDelay: `${i * 60}ms` }}
           >
             <div className="flex items-center gap-3">
@@ -359,7 +359,7 @@ export default function UserStatsPage() {
       {/* Session History + File Activity side by side */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Session History */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden card-enter" style={{ animationDelay: "120ms" }}>
+        <div className="bg-white/65 backdrop-blur-xl rounded-xl shadow-sm shadow-black/[0.04] border border-white/40 overflow-hidden card-enter" style={{ animationDelay: "120ms" }}>
           <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
             <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
               <LogIn className="w-4 h-4 text-gray-400" />
@@ -409,7 +409,7 @@ export default function UserStatsPage() {
         </div>
 
         {/* File Activity */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden card-enter" style={{ animationDelay: "180ms" }}>
+        <div className="bg-white/65 backdrop-blur-xl rounded-xl shadow-sm shadow-black/[0.04] border border-white/40 overflow-hidden card-enter" style={{ animationDelay: "180ms" }}>
           <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
             <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
               <FileSpreadsheet className="w-4 h-4 text-gray-400" />

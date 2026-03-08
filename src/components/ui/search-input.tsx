@@ -40,7 +40,7 @@ export function SearchInput({
         placeholder={placeholder}
         value={local}
         onChange={(e) => handleChange(e.target.value)}
-        className="w-full pl-9 pr-9 py-2 text-sm bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-300 transition-colors placeholder:text-gray-400"
+        className="w-full pl-9 pr-9 py-2 text-sm bg-white/60 backdrop-blur-sm border border-white/40 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-300 transition-colors placeholder:text-gray-400"
       />
       {local && (
         <button

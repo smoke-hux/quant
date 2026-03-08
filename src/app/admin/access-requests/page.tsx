@@ -46,7 +46,7 @@ function SkeletonRequests() {
         <div className="skeleton skeleton-title w-44" />
         <div className="skeleton skeleton-text w-72" />
       </div>
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 space-y-4">
+      <div className="bg-white/65 backdrop-blur-xl rounded-xl shadow-sm shadow-black/[0.04] border border-white/40 p-4 space-y-4">
         {[...Array(4)].map((_, i) => (
           <div key={i} className="flex items-center gap-4">
             <div className="skeleton skeleton-avatar" />
@@ -211,7 +211,7 @@ export default function AccessRequestsPage() {
         )}
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+      <div className="bg-white/65 backdrop-blur-xl rounded-xl shadow-sm shadow-black/[0.04] border border-white/40 overflow-hidden">
         {requests.length === 0 ? (
           <div className="px-6 py-16 text-center">
             <Shield className="w-12 h-12 text-gray-300 mx-auto mb-3" />
