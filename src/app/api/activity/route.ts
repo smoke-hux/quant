@@ -9,6 +9,7 @@ const VALID_ACTIONS = [
   "FILE_UPLOAD",
   "FILE_EDIT",
   "FILE_DOWNLOAD",
+  "PROJECT_OPEN",
 ];
 
 export const GET = withAuth(
@@ -24,10 +25,33 @@ export const GET = withAuth(
       parseInt(searchParams.get("offset") || "0") || 0
     );
     const action = searchParams.get("action");
+    const userSearch = searchParams.get("user");
+    const from = searchParams.get("from");
+    const to = searchParams.get("to");
 
-    // Validate action filter against allowed enum values
-    const where =
-      action && VALID_ACTIONS.includes(action) ? { action } : {};
+    // Build where clause with optional filters
+    const where: Record<string, unknown> = {};
+    if (action && VALID_ACTIONS.includes(action)) {
+      where.action = action;
+    }
+    if (userSearch) {
+      where.user = {
+        OR: [
+          { name: { contains: userSearch } },
+          { email: { contains: userSearch } },
+        ],
+      };
+    }
+    if (from || to) {
+      const timestampFilter: Record<string, Date> = {};
+      if (from) timestampFilter.gte = new Date(from);
+      if (to) {
+        const toDate = new Date(to);
+        toDate.setHours(23, 59, 59, 999);
+        timestampFilter.lte = toDate;
+      }
+      where.timestamp = timestampFilter;
+    }
 
     const [logs, total] = await Promise.all([
       prisma.activityLog.findMany({

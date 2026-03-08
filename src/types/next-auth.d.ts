@@ -11,6 +11,7 @@ declare module "next-auth" {
       email: string;
       name: string;
       role: string;
+      isTempAdmin?: boolean;
     };
     sessionExpired?: boolean;
   }
@@ -22,5 +23,6 @@ declare module "next-auth/jwt" {
     id?: string;
     sessionStart?: number;
     expired?: boolean;
+    isTempAdmin?: boolean;
   }
 }

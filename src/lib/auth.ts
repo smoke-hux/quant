@@ -131,6 +131,35 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         token.expired = false;
       }
 
+      // Check temp admin expiry and sync role from DB
+      if (token.id) {
+        const dbUser = await prisma.user.findUnique({
+          where: { id: token.id as string },
+          select: { role: true, tempAdminUntil: true },
+        });
+        if (dbUser) {
+          if (dbUser.tempAdminUntil && new Date(dbUser.tempAdminUntil) < new Date()) {
+            // Temp admin expired — revert to USER
+            await prisma.user.update({
+              where: { id: token.id as string },
+              data: { role: "USER", tempAdminUntil: null },
+            });
+            await prisma.activityLog.create({
+              data: {
+                userId: token.id as string,
+                action: "TEMP_ADMIN_EXPIRED",
+                details: "Temporary admin privileges expired",
+              },
+            });
+            token.role = "USER";
+            token.isTempAdmin = false;
+          } else {
+            token.role = dbUser.role;
+            token.isTempAdmin = !!dbUser.tempAdminUntil;
+          }
+        }
+      }
+
       // Check 2-hour session limit for non-admin users
       const TWO_HOURS = 2 * 60 * 60 * 1000;
       if (
@@ -147,6 +176,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       if (session.user) {
         session.user.role = token.role as string;
         session.user.id = token.id as string;
+        session.user.isTempAdmin = token.isTempAdmin === true;
       }
       session.sessionExpired = token.expired === true;
       return session;

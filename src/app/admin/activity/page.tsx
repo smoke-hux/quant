@@ -1,30 +1,33 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import {
+  ClipboardList,
+  Clock,
+  Download as DownloadIcon,
+  Filter,
+  X,
+} from "lucide-react";
+import { PageHeader } from "@/components/ui/page-header";
+import { DataTable, Pagination } from "@/components/ui/data-table";
+import { Avatar } from "@/components/ui/avatar";
+import { StatusBadge } from "@/components/ui/status-badge";
+import { SearchInput } from "@/components/ui/search-input";
+import { formatDateTime } from "@/lib/time-utils";
 
 interface ActivityLog {
   id: string;
   action: string;
   details: string | null;
   timestamp: string;
-  user: {
-    id: string;
-    name: string | null;
-    email: string;
-  };
+  user: { id: string; name: string | null; email: string };
 }
 
-const ACTION_COLORS: Record<string, string> = {
-  LOGIN: "bg-green-50 text-green-700",
-  LOGOUT: "bg-gray-100 text-gray-700",
-  FILE_UPLOAD: "bg-blue-50 text-blue-700",
-  FILE_EDIT: "bg-amber-50 text-amber-700",
-  FILE_DOWNLOAD: "bg-purple-50 text-purple-700",
-};
+const ACTIONS = ["LOGIN", "LOGOUT", "FILE_UPLOAD", "FILE_EDIT", "FILE_DOWNLOAD", "PROJECT_OPEN"];
 
 function SkeletonActivity() {
   return (
-    <div className="max-w-5xl page-enter">
+    <div className="max-w-6xl page-enter">
       <div className="flex items-center justify-between mb-6">
         <div>
           <div className="skeleton skeleton-title w-36" />
@@ -53,16 +56,22 @@ export default function ActivityPage() {
   const [logs, setLogs] = useState<ActivityLog[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState("");
-  const [page, setPage] = useState(0);
+  const [actionFilter, setActionFilter] = useState("");
+  const [userSearch, setUserSearch] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [page, setPage] = useState(1);
   const limit = 25;
 
   useEffect(() => {
     setLoading(true);
     const params = new URLSearchParams();
     params.set("limit", String(limit));
-    params.set("offset", String(page * limit));
-    if (filter) params.set("action", filter);
+    params.set("offset", String((page - 1) * limit));
+    if (actionFilter) params.set("action", actionFilter);
+    if (userSearch) params.set("user", userSearch);
+    if (dateFrom) params.set("from", dateFrom);
+    if (dateTo) params.set("to", dateTo);
 
     fetch(`/api/activity?${params}`)
       .then((r) => r.json())
@@ -72,8 +81,32 @@ export default function ActivityPage() {
         setLoading(false);
       })
       .catch(() => setLoading(false));
-  }, [filter, page]);
+  }, [actionFilter, userSearch, dateFrom, dateTo, page]);
 
+  function handleExportCSV() {
+    const header = "User,Email,Action,Details,Timestamp";
+    const rows = logs.map((l) =>
+      `"${l.user.name || ""}","${l.user.email}","${l.action}","${(l.details || "").replace(/"/g, '""')}","${l.timestamp}"`
+    );
+    const csv = [header, ...rows].join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `activity-log-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function clearFilters() {
+    setActionFilter("");
+    setUserSearch("");
+    setDateFrom("");
+    setDateTo("");
+    setPage(1);
+  }
+
+  const hasFilters = actionFilter || userSearch || dateFrom || dateTo;
   const totalPages = Math.ceil(total / limit);
 
   if (loading && logs.length === 0) {
@@ -81,132 +114,147 @@ export default function ActivityPage() {
   }
 
   return (
-    <div className="max-w-5xl page-enter">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">Activity Log</h2>
-          <p className="text-gray-500 mt-1">
-            Track user login, logout, and file activity.
-          </p>
-        </div>
+    <div className="max-w-6xl page-enter">
+      <PageHeader
+        title="Activity Log"
+        description="Track user login, logout, and file activity."
+        badge={{ label: "AUDIT", icon: ClipboardList }}
+        count={total}
+        actions={
+          <button
+            onClick={handleExportCSV}
+            disabled={logs.length === 0}
+            className="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 hover:border-gray-300 shadow-sm cursor-pointer transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <DownloadIcon className="w-4 h-4" />
+            Export CSV
+          </button>
+        }
+      />
+
+      {/* Filters */}
+      <div className="flex flex-col lg:flex-row items-start lg:items-center gap-3 mb-4">
+        <SearchInput
+          placeholder="Search by user..."
+          value={userSearch}
+          onChange={(v) => { setUserSearch(v); setPage(1); }}
+          className="w-full sm:w-64"
+        />
         <select
-          value={filter}
-          onChange={(e) => {
-            setFilter(e.target.value);
-            setPage(0);
-          }}
-          className="px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+          value={actionFilter}
+          onChange={(e) => { setActionFilter(e.target.value); setPage(1); }}
+          className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-300"
         >
           <option value="">All Actions</option>
-          <option value="LOGIN">Login</option>
-          <option value="LOGOUT">Logout</option>
-          <option value="FILE_UPLOAD">File Upload</option>
-          <option value="FILE_EDIT">File Edit</option>
-          <option value="FILE_DOWNLOAD">File Download</option>
+          {ACTIONS.map((a) => (
+            <option key={a} value={a}>{a.replace(/_/g, " ")}</option>
+          ))}
         </select>
-      </div>
-
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-        <div className="overflow-x-auto">
-        <table className="w-full min-w-[600px]">
-          <thead>
-            <tr className="bg-gray-50/80 border-b border-gray-200">
-              <th className="px-6 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                User
-              </th>
-              <th className="px-6 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                Action
-              </th>
-              <th className="px-6 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                Details
-              </th>
-              <th className="px-6 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                Timestamp
-              </th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100">
-            {logs.length === 0 ? (
-              <tr>
-                <td
-                  colSpan={4}
-                  className="px-6 py-12 text-center"
-                >
-                  <svg className="w-10 h-10 text-gray-300 mx-auto mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  <p className="text-sm text-gray-400">No activity logs found.</p>
-                </td>
-              </tr>
-            ) : (
-              logs.map((log, i) => (
-                <tr
-                  key={log.id}
-                  className="table-row-hover row-enter"
-                  style={{ animationDelay: `${i * 25}ms` }}
-                >
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center flex-shrink-0">
-                        <span className="text-xs font-semibold text-gray-600">
-                          {(log.user.name || log.user.email)[0].toUpperCase()}
-                        </span>
-                      </div>
-                      <div>
-                        <div className="text-sm font-medium text-gray-900">
-                          {log.user.name || "—"}
-                        </div>
-                        <div className="text-xs text-gray-400">
-                          {log.user.email}
-                        </div>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span
-                      className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${ACTION_COLORS[log.action] || "bg-gray-100 text-gray-700"}`}
-                    >
-                      {log.action.replace(/_/g, " ")}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-sm text-gray-500 max-w-xs truncate">
-                    {log.details || <span className="text-gray-300">—</span>}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400 tabular-nums">
-                    {new Date(log.timestamp).toLocaleString()}
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-
+        <div className="flex items-center gap-2">
+          <input
+            type="date"
+            value={dateFrom}
+            onChange={(e) => { setDateFrom(e.target.value); setPage(1); }}
+            className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-300"
+          />
+          <span className="text-gray-400 text-sm">to</span>
+          <input
+            type="date"
+            value={dateTo}
+            onChange={(e) => { setDateTo(e.target.value); setPage(1); }}
+            className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-300"
+          />
         </div>
-        {totalPages > 1 && (
-          <div className="flex items-center justify-between px-6 py-3.5 border-t border-gray-100 bg-gray-50/50">
-            <div className="text-sm text-gray-500">
-              Showing <span className="font-medium">{page * limit + 1}</span>–<span className="font-medium">{Math.min((page + 1) * limit, total)}</span>{" "}
-              of <span className="font-medium">{total}</span>
-            </div>
-            <div className="flex gap-2">
-              <button
-                onClick={() => setPage(Math.max(0, page - 1))}
-                disabled={page === 0}
-                className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg disabled:opacity-40 hover:bg-white hover:border-gray-300 font-medium"
-              >
-                Previous
-              </button>
-              <button
-                onClick={() => setPage(Math.min(totalPages - 1, page + 1))}
-                disabled={page >= totalPages - 1}
-                className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg disabled:opacity-40 hover:bg-white hover:border-gray-300 font-medium"
-              >
-                Next
-              </button>
-            </div>
-          </div>
+        {hasFilters && (
+          <button
+            onClick={clearFilters}
+            className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700 cursor-pointer"
+          >
+            <X className="w-3 h-3" />
+            Clear filters
+          </button>
         )}
       </div>
+
+      {/* Active filter pills */}
+      {hasFilters && (
+        <div className="flex flex-wrap gap-2 mb-4">
+          {actionFilter && (
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-blue-50 text-blue-700 text-xs font-medium rounded-full">
+              <Filter className="w-3 h-3" />
+              {actionFilter.replace(/_/g, " ")}
+              <button onClick={() => setActionFilter("")} className="ml-0.5 cursor-pointer"><X className="w-3 h-3" /></button>
+            </span>
+          )}
+          {userSearch && (
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-blue-50 text-blue-700 text-xs font-medium rounded-full">
+              User: {userSearch}
+              <button onClick={() => setUserSearch("")} className="ml-0.5 cursor-pointer"><X className="w-3 h-3" /></button>
+            </span>
+          )}
+          {(dateFrom || dateTo) && (
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-blue-50 text-blue-700 text-xs font-medium rounded-full">
+              {dateFrom || "..."} - {dateTo || "..."}
+              <button onClick={() => { setDateFrom(""); setDateTo(""); }} className="ml-0.5 cursor-pointer"><X className="w-3 h-3" /></button>
+            </span>
+          )}
+        </div>
+      )}
+
+      <DataTable
+        isEmpty={logs.length === 0}
+        empty={
+          <div>
+            <Clock className="w-10 h-10 text-gray-300 mx-auto mb-3" />
+            <p className="text-sm text-gray-400">No activity logs found.</p>
+          </div>
+        }
+        headers={
+          <>
+            <th className="px-6 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">User</th>
+            <th className="px-6 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Action</th>
+            <th className="px-6 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Details</th>
+            <th className="px-6 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Timestamp</th>
+          </>
+        }
+      >
+        {logs.map((log, i) => (
+          <tr
+            key={log.id}
+            className="table-row-hover row-enter"
+            style={{ animationDelay: `${i * 25}ms` }}
+          >
+            <td className="px-6 py-4 whitespace-nowrap">
+              <div className="flex items-center gap-3">
+                <Avatar name={log.user.name} email={log.user.email} size="sm" />
+                <div>
+                  <div className="text-sm font-medium text-gray-900">{log.user.name || "\u2014"}</div>
+                  <div className="text-xs text-gray-400">{log.user.email}</div>
+                </div>
+              </div>
+            </td>
+            <td className="px-6 py-4 whitespace-nowrap">
+              <StatusBadge status={log.action} />
+            </td>
+            <td className="px-6 py-4 text-sm text-gray-500 max-w-xs truncate">
+              {log.details || <span className="text-gray-300">&mdash;</span>}
+            </td>
+            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400 tabular-nums">
+              {formatDateTime(log.timestamp)}
+            </td>
+          </tr>
+        ))}
+      </DataTable>
+
+      {totalPages > 1 && (
+        <Pagination
+          page={page}
+          totalPages={totalPages}
+          totalItems={total}
+          pageSize={limit}
+          onPageChange={setPage}
+        />
+      )}
     </div>
   );
 }

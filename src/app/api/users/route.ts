@@ -18,6 +18,7 @@ export const GET = withAuth(
         email: true,
         role: true,
         createdAt: true,
+        tempAdminUntil: true,
         activityLogs: {
           where: { action: "LOGIN" },
           orderBy: { timestamp: "desc" },
@@ -32,6 +33,7 @@ export const GET = withAuth(
     const usersWithLastLogin = users.map((user) => ({
       ...user,
       lastLogin: user.activityLogs[0]?.timestamp || null,
+      tempAdminUntil: user.tempAdminUntil?.toISOString() || null,
       activityLogs: undefined,
     }));
 
@@ -93,8 +95,8 @@ export const PATCH = withAuth(
 
     const user = await prisma.user.update({
       where: { id: userId },
-      data: { role },
-      select: { id: true, name: true, email: true, role: true },
+      data: { role, tempAdminUntil: null },
+      select: { id: true, name: true, email: true, role: true, tempAdminUntil: true },
     });
 
     return NextResponse.json(user);

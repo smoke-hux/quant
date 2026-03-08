@@ -13,6 +13,7 @@ export const authConfig = {
 
       // Public routes — always allow
       if (
+        pathname === "/" ||
         pathname === "/login" ||
         pathname === "/unavailable" ||
         pathname.startsWith("/api/auth") ||

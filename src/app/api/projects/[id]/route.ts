@@ -3,6 +3,37 @@ import { NextResponse } from "next/server";
 import { withAuth, safeJson } from "@/lib/api-utils";
 import { validate, putProjectSchema } from "@/lib/validations";
 
+export const DELETE = withAuth(
+  { auth: "admin", rateLimit: "api" },
+  async (_req, { session, params }) => {
+    const { id } = await params;
+    const project = await prisma.excelProject.findUnique({
+      where: { id },
+      select: { id: true, name: true },
+    });
+
+    if (!project) {
+      return NextResponse.json(
+        { error: "Project not found" },
+        { status: 404 }
+      );
+    }
+
+    // Documents cascade via onDelete: Cascade in schema
+    await prisma.excelProject.delete({ where: { id } });
+
+    await prisma.activityLog.create({
+      data: {
+        userId: session.user.id,
+        action: "PROJECT_DELETED",
+        details: `Deleted project: ${project.name}`,
+      },
+    });
+
+    return NextResponse.json({ success: true });
+  }
+);
+
 export const GET = withAuth(
   { auth: "user", rateLimit: "api" },
   async (_req, { session, params }) => {

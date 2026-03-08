@@ -15,6 +15,7 @@ model User {
   role          String         @default("USER") // ADMIN | USER
   createdAt     DateTime       @default(now())
   scheduleOverrideUntil DateTime? // Admin-granted schedule bypass, null = no override
+  tempAdminUntil        DateTime? // Temporary admin privileges, null = permanent role
   accounts      Account[]
   sessions      Session[]
   schedules     WorkSchedule[] @relation("CreatedSchedules")

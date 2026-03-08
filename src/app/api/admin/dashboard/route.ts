@@ -14,7 +14,7 @@ export const GET = withAuth(
     todayStart.setHours(0, 0, 0, 0);
 
     // Fetch all data in parallel (single batch for maximum concurrency)
-    const [users, todayLogs, recentLogs, activeProjects, pendingAccessRequests, sessionLogs, lastActivityLogs] = await Promise.all([
+    const [users, todayLogs, recentLogs, activeProjects, pendingAccessRequests, sessionLogs, lastActivityLogs, recentUserActions] = await Promise.all([
       prisma.user.findMany({
         select: { id: true, name: true, email: true, role: true },
         orderBy: { createdAt: "desc" },
@@ -65,6 +65,15 @@ export const GET = withAuth(
         orderBy: { timestamp: "desc" },
         select: { userId: true, timestamp: true },
       }),
+      // Recent non-login actions per user to show what they're working on
+      prisma.activityLog.findMany({
+        where: {
+          action: { in: ["FILE_EDIT", "FILE_UPLOAD", "FILE_DOWNLOAD", "PROJECT_OPEN"] },
+          timestamp: { gte: twoHoursAgo },
+        },
+        orderBy: { timestamp: "desc" },
+        select: { userId: true, action: true, details: true, timestamp: true },
+      }),
     ]);
 
     // Build per-user session/activity maps
@@ -87,6 +96,18 @@ export const GET = withAuth(
       }
     }
 
+    // Build per-user current work map (what they're working on right now)
+    const currentWorkMap = new Map<string, { action: string; details: string | null; timestamp: Date }>();
+    for (const log of recentUserActions) {
+      if (!currentWorkMap.has(log.userId)) {
+        currentWorkMap.set(log.userId, {
+          action: log.action,
+          details: log.details,
+          timestamp: log.timestamp,
+        });
+      }
+    }
+
     // Determine user statuses
     const idleThreshold = new Date(now.getTime() - IDLE_THRESHOLD_MS);
 
@@ -94,6 +115,7 @@ export const GET = withAuth(
       const lastLogin = lastLoginMap.get(user.id);
       const lastLogout = lastLogoutMap.get(user.id);
       const lastActivity = lastActivityMap.get(user.id) || null;
+      const currentWork = currentWorkMap.get(user.id) || null;
 
       let status: "online" | "idle" | "offline" = "offline";
 
@@ -115,6 +137,13 @@ export const GET = withAuth(
         role: user.role,
         status,
         lastActivity: lastActivity?.toISOString() || null,
+        currentWork: currentWork
+          ? {
+              action: currentWork.action,
+              details: currentWork.details,
+              timestamp: currentWork.timestamp.toISOString(),
+            }
+          : null,
       };
     });
 

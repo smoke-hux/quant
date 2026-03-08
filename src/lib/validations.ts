@@ -33,7 +33,7 @@ export const updateProjectSchema = z.object({
 
 // LOGIN is system-only (logged in signIn callback); LOGOUT is user-initiated (sign-out button)
 export const activityLogSchema = z.object({
-  action: z.enum(["LOGOUT", "FILE_UPLOAD", "FILE_EDIT", "FILE_DOWNLOAD"]),
+  action: z.enum(["LOGOUT", "FILE_UPLOAD", "FILE_EDIT", "FILE_DOWNLOAD", "PROJECT_OPEN"]),
   details: z.string().max(500).optional(),
 });
 
@@ -65,6 +65,22 @@ export const reviewAccessRequestSchema = z.object({
   requestId: z.string().min(1),
   action: z.enum(["APPROVE", "DENY"]),
   overrideHours: z.number().min(1).max(72).optional(),
+});
+
+export const grantTempAdminSchema = z.object({
+  userId: z.string().min(1),
+  hours: z.number().int().min(1).max(72),
+});
+
+export const revokeTempAdminSchema = z.object({
+  userId: z.string().min(1),
+});
+
+export const bulkProjectActionSchema = z.object({
+  projectIds: z.array(z.string().min(1)).min(1),
+  action: z.enum(["UPDATE_STATUS", "TRANSFER", "DELETE"]),
+  status: z.enum(["PENDING", "IN_PROGRESS", "COMPLETED"]).optional(),
+  assignedToId: z.string().nullable().optional(),
 });
 
 export function validate<T>(

@@ -2,14 +2,32 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
+import {
+  Users,
+  LogIn,
+  FileEdit,
+  Upload,
+  Download,
+  KeyRound,
+  ArrowRight,
+  RefreshCw,
+  Clock,
+  FolderOpen,
+  FileText,
+  Activity,
+  Eye,
+  Monitor,
+} from "lucide-react";
+import { PageHeader } from "@/components/ui/page-header";
+import { Card } from "@/components/ui/card";
+import { Avatar } from "@/components/ui/avatar";
+import { StatusBadge } from "@/components/ui/status-badge";
+import { Sparkline } from "@/components/ui/sparkline";
+import { timeAgo } from "@/lib/time-utils";
 
-interface OnlineUser {
-  id: string;
-  name: string | null;
-  email: string;
-  lastActivity: string | null;
-}
-
+/* ================================================================
+   Types
+   ================================================================ */
 interface TodayStats {
   totalLogins: number;
   activeUsers: number;
@@ -35,6 +53,12 @@ interface ActiveProject {
   assignedTo: { id: string; name: string | null; email: string } | null;
 }
 
+interface CurrentWork {
+  action: string;
+  details: string | null;
+  timestamp: string;
+}
+
 interface UserStatus {
   id: string;
   name: string | null;
@@ -42,10 +66,11 @@ interface UserStatus {
   role: string;
   status: "online" | "idle" | "offline";
   lastActivity: string | null;
+  currentWork: CurrentWork | null;
 }
 
 interface DashboardData {
-  onlineUsers: OnlineUser[];
+  onlineUsers: { id: string; name: string | null; email: string; lastActivity: string | null }[];
   todayStats: TodayStats;
   recentActivity: ActivityLog[];
   activeProjects: ActiveProject[];
@@ -53,37 +78,38 @@ interface DashboardData {
   pendingAccessRequests: number;
 }
 
-const ACTION_COLORS: Record<string, string> = {
-  LOGIN: "bg-green-100 text-green-700",
-  LOGOUT: "bg-gray-100 text-gray-700",
-  FILE_UPLOAD: "bg-blue-100 text-blue-700",
-  FILE_EDIT: "bg-amber-100 text-amber-700",
-  FILE_DOWNLOAD: "bg-purple-100 text-purple-700",
-};
-
-const STATUS_DOT: Record<string, string> = {
-  online: "bg-green-500",
-  idle: "bg-yellow-400",
-  offline: "bg-gray-300",
-};
-
-function timeAgo(timestamp: string): string {
-  const seconds = Math.floor(
-    (Date.now() - new Date(timestamp).getTime()) / 1000
-  );
-  if (seconds < 60) return "just now";
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  return `${days}d ago`;
+interface TrendData {
+  days: string[];
+  logins: number[];
+  edits: number[];
+  uploads: number[];
+  downloads: number[];
 }
 
+/* ================================================================
+   Helpers
+   ================================================================ */
+function getActionLabel(action: string): { label: string; icon: typeof FileEdit } {
+  switch (action) {
+    case "FILE_EDIT":
+      return { label: "Editing", icon: FileEdit };
+    case "FILE_UPLOAD":
+      return { label: "Uploading", icon: Upload };
+    case "FILE_DOWNLOAD":
+      return { label: "Downloading", icon: Download };
+    case "PROJECT_OPEN":
+      return { label: "Viewing", icon: Eye };
+    default:
+      return { label: action.replace(/_/g, " "), icon: Activity };
+  }
+}
+
+/* ================================================================
+   Skeleton
+   ================================================================ */
 function SkeletonDashboard() {
   return (
     <div className="max-w-7xl page-enter">
-      {/* Header skeleton */}
       <div className="flex items-center justify-between mb-6">
         <div>
           <div className="skeleton skeleton-title w-48" />
@@ -91,13 +117,11 @@ function SkeletonDashboard() {
         </div>
         <div className="skeleton h-8 w-24 rounded-lg" />
       </div>
-      {/* Stat cards skeleton */}
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4 mb-6">
         {[...Array(5)].map((_, i) => (
           <div key={i} className="skeleton skeleton-card" />
         ))}
       </div>
-      {/* Content skeleton */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
         <div className="lg:col-span-2 skeleton h-80 rounded-xl" />
         <div className="skeleton h-80 rounded-xl" />
@@ -107,19 +131,24 @@ function SkeletonDashboard() {
   );
 }
 
+/* ================================================================
+   Main
+   ================================================================ */
 export default function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
+  const [trends, setTrends] = useState<TrendData | null>(null);
   const [loading, setLoading] = useState(true);
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
+  const [statusFilter, setStatusFilter] = useState<"all" | "online" | "idle" | "offline">("all");
 
   const fetchData = useCallback(() => {
-    fetch("/api/admin/dashboard")
-      .then((r) => {
-        if (!r.ok) throw new Error("Failed to fetch");
-        return r.json();
-      })
-      .then((d) => {
-        setData(d);
+    Promise.all([
+      fetch("/api/admin/dashboard").then((r) => r.ok ? r.json() : null),
+      fetch("/api/admin/dashboard/trends").then((r) => r.ok ? r.json() : null),
+    ])
+      .then(([dashData, trendData]) => {
+        if (dashData) setData(dashData);
+        if (trendData) setTrends(trendData);
         setLoading(false);
         setLastRefresh(new Date());
       })
@@ -136,116 +165,113 @@ export default function DashboardPage() {
     return <SkeletonDashboard />;
   }
 
-  const onlineCount = data.userStatuses.filter(
-    (u) => u.status === "online"
-  ).length;
-  const idleCount = data.userStatuses.filter(
-    (u) => u.status === "idle"
-  ).length;
+  const onlineCount = data.userStatuses.filter((u) => u.status === "online").length;
+  const idleCount = data.userStatuses.filter((u) => u.status === "idle").length;
+  const offlineCount = data.userStatuses.filter((u) => u.status === "offline").length;
 
   const statCards = [
     {
       label: "Online Now",
       value: onlineCount,
       sub: idleCount > 0 ? `+${idleCount} idle` : undefined,
-      icon: (
-        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-1.997M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />
-        </svg>
-      ),
+      icon: Users,
       dot: true,
       gradient: "from-green-50 to-emerald-50",
       iconBg: "bg-green-100 text-green-600",
+      sparkData: trends?.logins,
+      sparkColor: "#22c55e",
     },
     {
       label: "Logins Today",
       value: data.todayStats.totalLogins,
       sub: `${data.todayStats.activeUsers} unique users`,
-      icon: (
-        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
-        </svg>
-      ),
+      icon: LogIn,
       gradient: "from-blue-50 to-indigo-50",
       iconBg: "bg-blue-100 text-blue-600",
+      sparkData: trends?.logins,
+      sparkColor: "#3b82f6",
     },
     {
       label: "Files Edited",
       value: data.todayStats.filesEdited,
       sub: "today",
-      icon: (
-        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
-        </svg>
-      ),
+      icon: FileEdit,
       gradient: "from-amber-50 to-yellow-50",
       iconBg: "bg-amber-100 text-amber-600",
+      sparkData: trends?.edits,
+      sparkColor: "#f59e0b",
     },
     {
       label: "Uploaded",
       value: data.todayStats.filesUploaded,
       sub: "today",
-      icon: (
-        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
-        </svg>
-      ),
+      icon: Upload,
       gradient: "from-violet-50 to-purple-50",
       iconBg: "bg-violet-100 text-violet-600",
+      sparkData: trends?.uploads,
+      sparkColor: "#8b5cf6",
     },
     {
       label: "Downloads",
       value: data.todayStats.filesDownloaded,
       sub: "today",
-      icon: (
-        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
-        </svg>
-      ),
+      icon: Download,
       gradient: "from-rose-50 to-pink-50",
       iconBg: "bg-rose-100 text-rose-600",
+      sparkData: trends?.downloads,
+      sparkColor: "#f43f5e",
     },
+  ];
+
+  // Filter users for the status grid
+  const filteredUsers = data.userStatuses
+    .filter((u) => statusFilter === "all" || u.status === statusFilter)
+    .sort((a, b) => {
+      const order = { online: 0, idle: 1, offline: 2 };
+      return order[a.status] - order[b.status];
+    });
+
+  const statusFilterButtons = [
+    { key: "all" as const, label: "All", count: data.userStatuses.length },
+    { key: "online" as const, label: "Online", count: onlineCount },
+    { key: "idle" as const, label: "Idle", count: idleCount },
+    { key: "offline" as const, label: "Offline", count: offlineCount },
   ];
 
   return (
     <div className="max-w-7xl page-enter">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">
-            Live Dashboard
-          </h2>
-          <p className="text-gray-500 mt-1">
-            Monitor all user activity in real time.
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
-          <span className="text-xs text-gray-400">
-            Updated {lastRefresh.toLocaleTimeString()}
-          </span>
-          <button
-            onClick={fetchData}
-            className="px-3 py-1.5 text-sm text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 hover:border-gray-300 shadow-sm"
-          >
-            <svg className="w-4 h-4 inline-block mr-1.5 -mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182" />
-            </svg>
-            Refresh
-          </button>
-        </div>
-      </div>
+      <PageHeader
+        title="Live Dashboard"
+        description="Monitor all user activity in real time."
+        badge={{ label: "LIVE", icon: Activity }}
+        actions={
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-gray-400 hidden sm:inline">
+              Updated {lastRefresh.toLocaleTimeString()}
+            </span>
+            <button
+              onClick={fetchData}
+              className="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 hover:border-gray-300 shadow-sm cursor-pointer transition-colors"
+            >
+              <RefreshCw className="w-4 h-4" />
+              Refresh
+            </button>
+          </div>
+        }
+      />
 
-      {/* Stat Cards — Responsive grid */}
+      {/* Stat Cards */}
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4 mb-6">
         {statCards.map((card, i) => (
           <div
             key={card.label}
-            className={`bg-gradient-to-br ${card.gradient} rounded-xl border border-gray-100 p-5 card-enter hover-lift`}
+            className={`bg-gradient-to-br ${card.gradient} rounded-xl border border-gray-100 p-5 card-enter hover-lift cursor-default`}
             style={{ animationDelay: `${i * 80}ms` }}
           >
             <div className="flex items-center justify-between mb-3">
               <div className={`w-9 h-9 rounded-lg ${card.iconBg} flex items-center justify-center`}>
-                {card.icon}
+                <card.icon className="w-5 h-5" />
               </div>
               {card.dot && (
                 <span className="w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse" />
@@ -256,6 +282,12 @@ export default function DashboardPage() {
             {card.sub && (
               <p className="text-[11px] text-gray-400 mt-0.5">{card.sub}</p>
             )}
+            {/* Sparkline */}
+            {card.sparkData && card.sparkData.length > 0 && (
+              <div className="mt-2 -mx-1">
+                <Sparkline data={card.sparkData} color={card.sparkColor} height={32} />
+              </div>
+            )}
           </div>
         ))}
       </div>
@@ -264,15 +296,13 @@ export default function DashboardPage() {
       {data.pendingAccessRequests > 0 && (
         <Link
           href="/admin/access-requests"
-          className="block mb-6 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-xl px-6 py-4 hover:shadow-md transition-all card-enter hover-lift"
+          className="block mb-6 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-xl px-6 py-4 hover:shadow-md transition-all card-enter hover-lift cursor-pointer"
           style={{ animationDelay: "0.35s" }}
         >
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-lg bg-amber-100 flex items-center justify-center">
-                <svg className="w-5 h-5 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
-                </svg>
+                <KeyRound className="w-5 h-5 text-amber-600" />
               </div>
               <div>
                 <p className="text-sm font-semibold text-amber-900">
@@ -285,9 +315,7 @@ export default function DashboardPage() {
             </div>
             <div className="flex items-center gap-2 text-sm font-medium text-amber-700">
               Review
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
-              </svg>
+              <ArrowRight className="w-4 h-4" />
             </div>
           </div>
         </Link>
@@ -295,28 +323,21 @@ export default function DashboardPage() {
 
       {/* Middle: Activity Feed + Active Projects */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-        {/* Live Activity Feed — 2 cols */}
-        <div className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden card-enter" style={{ animationDelay: "0.4s" }}>
+        {/* Live Activity Feed */}
+        <Card className="lg:col-span-2 !p-0 overflow-hidden card-enter" style={{ animationDelay: "0.4s" }}>
           <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-              <h3 className="text-base font-semibold text-gray-900">
-                Live Activity
-              </h3>
+              <h3 className="text-base font-semibold text-gray-900">Live Activity</h3>
             </div>
-            <Link
-              href="/admin/activity"
-              className="text-sm text-blue-600 hover:text-blue-800 font-medium"
-            >
+            <Link href="/admin/activity" className="text-sm text-blue-600 hover:text-blue-800 font-medium cursor-pointer">
               View all
             </Link>
           </div>
           <div className="max-h-[420px] overflow-y-auto divide-y divide-gray-50">
             {data.recentActivity.length === 0 ? (
               <div className="px-6 py-12 text-center">
-                <svg className="w-10 h-10 text-gray-300 mx-auto mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
+                <Clock className="w-10 h-10 text-gray-300 mx-auto mb-3" />
                 <p className="text-sm text-gray-400">No activity yet.</p>
               </div>
             ) : (
@@ -326,26 +347,16 @@ export default function DashboardPage() {
                   className="px-6 py-3 flex items-center gap-4 hover:bg-gray-50/80 row-enter"
                   style={{ animationDelay: `${i * 30}ms` }}
                 >
-                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center flex-shrink-0">
-                    <span className="text-xs font-semibold text-gray-600">
-                      {(log.user.name || log.user.email)[0].toUpperCase()}
-                    </span>
-                  </div>
+                  <Avatar name={log.user.name} email={log.user.email} size="sm" />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-medium text-gray-900 truncate">
                         {log.user.name || log.user.email}
                       </span>
-                      <span
-                        className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold ${ACTION_COLORS[log.action] || "bg-gray-100 text-gray-700"}`}
-                      >
-                        {log.action.replace(/_/g, " ")}
-                      </span>
+                      <StatusBadge status={log.action} />
                     </div>
                     {log.details && (
-                      <p className="text-xs text-gray-400 truncate mt-0.5">
-                        {log.details}
-                      </p>
+                      <p className="text-xs text-gray-400 truncate mt-0.5">{log.details}</p>
                     )}
                   </div>
                   <span className="text-[11px] text-gray-400 flex-shrink-0 tabular-nums">
@@ -355,27 +366,20 @@ export default function DashboardPage() {
               ))
             )}
           </div>
-        </div>
+        </Card>
 
-        {/* Active Projects — 1 col */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden card-enter" style={{ animationDelay: "0.5s" }}>
+        {/* Active Projects */}
+        <Card className="!p-0 overflow-hidden card-enter" style={{ animationDelay: "0.5s" }}>
           <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-            <h3 className="text-base font-semibold text-gray-900">
-              Active Projects
-            </h3>
-            <Link
-              href="/admin/projects"
-              className="text-sm text-blue-600 hover:text-blue-800 font-medium"
-            >
+            <h3 className="text-base font-semibold text-gray-900">Active Projects</h3>
+            <Link href="/admin/projects" className="text-sm text-blue-600 hover:text-blue-800 font-medium cursor-pointer">
               View all
             </Link>
           </div>
           <div className="max-h-[420px] overflow-y-auto divide-y divide-gray-50">
             {data.activeProjects.length === 0 ? (
               <div className="px-6 py-12 text-center">
-                <svg className="w-10 h-10 text-gray-300 mx-auto mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z" />
-                </svg>
+                <FolderOpen className="w-10 h-10 text-gray-300 mx-auto mb-3" />
                 <p className="text-sm text-gray-400">No projects in progress.</p>
               </div>
             ) : (
@@ -383,19 +387,13 @@ export default function DashboardPage() {
                 <div key={project.id} className="px-6 py-4 hover:bg-gray-50/80 row-enter" style={{ animationDelay: `${i * 50}ms` }}>
                   <div className="flex items-start justify-between">
                     <div className="min-w-0">
-                      <p className="text-sm font-medium text-gray-900 truncate">
-                        {project.name}
-                      </p>
+                      <p className="text-sm font-medium text-gray-900 truncate">{project.name}</p>
                       <p className="text-xs text-gray-400 mt-0.5 flex items-center gap-1">
-                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
-                        </svg>
+                        <FileText className="w-3 h-3" />
                         {project.fileName}
                       </p>
                     </div>
-                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-blue-100 text-blue-700 flex-shrink-0 ml-2">
-                      In Progress
-                    </span>
+                    <StatusBadge status="IN_PROGRESS" className="flex-shrink-0 ml-2" />
                   </div>
                   <div className="flex items-center justify-between mt-2">
                     <span className="text-xs text-gray-500">
@@ -411,71 +409,100 @@ export default function DashboardPage() {
               ))
             )}
           </div>
-        </div>
+        </Card>
       </div>
 
       {/* User Status Grid */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden card-enter" style={{ animationDelay: "0.6s" }}>
-        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-          <h3 className="text-base font-semibold text-gray-900">
-            All Users
-          </h3>
-          <div className="flex items-center gap-4 text-xs text-gray-500">
-            <span className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-green-500" /> Online
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-yellow-400" /> Idle
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-gray-300" /> Offline
-            </span>
+      <Card className="!p-0 overflow-hidden card-enter" style={{ animationDelay: "0.6s" }}>
+        <div className="px-6 py-4 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <Monitor className="w-4 h-4 text-gray-400" />
+            <h3 className="text-base font-semibold text-gray-900">User Activity Monitor</h3>
+          </div>
+          {/* Status filter pills */}
+          <div className="flex items-center gap-1.5">
+            {statusFilterButtons.map((btn) => (
+              <button
+                key={btn.key}
+                onClick={() => setStatusFilter(btn.key)}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
+                  statusFilter === btn.key
+                    ? "bg-blue-600 text-white"
+                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                }`}
+              >
+                {btn.label}
+                <span className={`px-1.5 py-0.5 rounded-md text-[10px] ${
+                  statusFilter === btn.key ? "bg-blue-500 text-white" : "bg-gray-200 text-gray-500"
+                }`}>
+                  {btn.count}
+                </span>
+              </button>
+            ))}
           </div>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-0 divide-x divide-y divide-gray-100">
-          {data.userStatuses
-            .sort((a, b) => {
-              const order = { online: 0, idle: 1, offline: 2 };
-              return order[a.status] - order[b.status];
-            })
-            .map((user, i) => (
-              <Link
-                key={user.id}
-                href={`/admin/users/${user.id}`}
-                className="px-5 py-4 hover:bg-gray-50/80 transition-colors row-enter"
-                style={{ animationDelay: `${i * 30}ms` }}
-              >
-                <div className="flex items-center gap-3">
-                  <div className="relative">
-                    <div className="w-9 h-9 rounded-full bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center">
-                      <span className="text-sm font-semibold text-gray-600">
-                        {(user.name || user.email)[0].toUpperCase()}
-                      </span>
-                    </div>
-                    <span
-                      className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white ${STATUS_DOT[user.status]}`}
-                    />
-                  </div>
+        <div className="divide-y divide-gray-50">
+          {filteredUsers.length === 0 ? (
+            <div className="px-6 py-12 text-center">
+              <Users className="w-10 h-10 text-gray-300 mx-auto mb-3" />
+              <p className="text-sm text-gray-400">No {statusFilter} users.</p>
+            </div>
+          ) : (
+            filteredUsers.map((user, i) => {
+              const work = user.currentWork;
+              const actionInfo = work ? getActionLabel(work.action) : null;
+              const ActionIcon = actionInfo?.icon;
+
+              return (
+                <Link
+                  key={user.id}
+                  href={`/admin/users/${user.id}`}
+                  className="flex items-center gap-4 px-6 py-4 hover:bg-gray-50/80 transition-colors row-enter cursor-pointer"
+                  style={{ animationDelay: `${i * 30}ms` }}
+                >
+                  <Avatar name={user.name} email={user.email} size="sm" status={user.status} />
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium text-gray-900 truncate">
-                      {user.name || "Unnamed"}
-                    </p>
-                    <p className="text-xs text-gray-400 truncate">
-                      {user.lastActivity
-                        ? timeAgo(user.lastActivity)
-                        : "No activity"}
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-medium text-gray-900 truncate">
+                        {user.name || "Unnamed"}
+                      </p>
+                      {user.role === "ADMIN" && (
+                        <StatusBadge status="ADMIN" className="flex-shrink-0" />
+                      )}
+                    </div>
+                    <p className="text-xs text-gray-400 truncate">{user.email}</p>
+                  </div>
+                  {/* Current activity */}
+                  <div className="hidden sm:flex items-center gap-3 flex-shrink-0">
+                    {work && actionInfo && ActionIcon ? (
+                      <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 rounded-lg">
+                        <ActionIcon className="w-3.5 h-3.5 text-blue-500" />
+                        <div className="text-xs">
+                          <span className="font-medium text-blue-700">{actionInfo.label}</span>
+                          {work.details && (
+                            <span className="text-blue-500 ml-1 max-w-[160px] truncate inline-block align-bottom">
+                              {work.details}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    ) : user.status !== "offline" ? (
+                      <span className="text-xs text-gray-400 italic">No recent file activity</span>
+                    ) : null}
+                  </div>
+                  {/* Time info */}
+                  <div className="text-right flex-shrink-0">
+                    <StatusBadge status={user.status} showDot />
+                    <p className="text-[11px] text-gray-400 mt-1 tabular-nums">
+                      {user.lastActivity ? timeAgo(user.lastActivity) : "No activity"}
                     </p>
                   </div>
-                  {user.role === "ADMIN" && (
-                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-purple-100 text-purple-700 flex-shrink-0">
-                      ADMIN
-                    </span>
-                  )}
-                </div>
-              </Link>
-            ))}
+                </Link>
+              );
+            })
+          )}
         </div>
-      </div>
+      </Card>
     </div>
   );
 }

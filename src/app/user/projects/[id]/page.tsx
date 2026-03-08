@@ -34,6 +34,12 @@ export default function ProjectEditorPage() {
       .then((data) => {
         setProject(data);
         setLoading(false);
+        // Log project open for admin activity tracking
+        fetch("/api/activity", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "PROJECT_OPEN", details: data.name }),
+        }).catch(() => {});
       })
       .catch((err) => {
         setError(err.message);
@@ -75,7 +81,7 @@ export default function ProjectEditorPage() {
   }
 
   return (
-    <div className="h-[calc(100vh-8rem)] -m-8 flex flex-col">
+    <div className="h-[calc(100vh-8rem)] -m-4 lg:-m-8 flex flex-col">
       {/* Top bar */}
       <div className="px-4 py-2 bg-white border-b border-gray-200 flex items-center justify-between">
         <button
@@ -126,13 +132,20 @@ export default function ProjectEditorPage() {
           />
         </div>
         {showDocs && (
-          <div className="w-80 border-l border-gray-200 bg-white overflow-y-auto flex-shrink-0">
-            <DocumentsPanel
-              projectId={project.id}
-              projectName={project.name}
-              isAdmin={session?.user?.role === "ADMIN"}
-              currentUserId={session?.user?.id}
+          <div className="fixed inset-0 z-40 lg:relative lg:inset-auto lg:z-auto lg:w-80 lg:flex-shrink-0">
+            {/* Mobile backdrop */}
+            <div
+              className="absolute inset-0 bg-black/50 lg:hidden"
+              onClick={() => setShowDocs(false)}
             />
+            <div className="absolute right-0 top-0 bottom-0 w-80 max-w-full border-l border-gray-200 bg-white overflow-y-auto lg:static lg:w-full">
+              <DocumentsPanel
+                projectId={project.id}
+                projectName={project.name}
+                isAdmin={session?.user?.role === "ADMIN"}
+                currentUserId={session?.user?.id}
+              />
+            </div>
           </div>
         )}
       </div>

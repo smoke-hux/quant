@@ -2,6 +2,24 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import {
+  Users,
+  Plus,
+  X,
+  BarChart3,
+  ArrowUpDown,
+  AlertCircle,
+  Clock,
+  Shield,
+  ShieldOff,
+} from "lucide-react";
+import { PageHeader } from "@/components/ui/page-header";
+import { DataTable } from "@/components/ui/data-table";
+import { Avatar } from "@/components/ui/avatar";
+import { StatusBadge } from "@/components/ui/status-badge";
+import { SearchInput } from "@/components/ui/search-input";
+import { useToast } from "@/components/ui/toast-provider";
+import { timeAgo } from "@/lib/time-utils";
 
 interface User {
   id: string;
@@ -10,11 +28,28 @@ interface User {
   role: string;
   createdAt: string;
   lastLogin: string | null;
+  tempAdminUntil: string | null;
+}
+
+const TEMP_DURATIONS = [
+  { label: "2h", hours: 2 },
+  { label: "4h", hours: 4 },
+  { label: "8h", hours: 8 },
+  { label: "24h", hours: 24 },
+];
+
+function formatTimeRemaining(until: string): string {
+  const diff = new Date(until).getTime() - Date.now();
+  if (diff <= 0) return "Expired";
+  const hours = Math.floor(diff / (1000 * 60 * 60));
+  const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+  if (hours > 0) return `${hours}h ${minutes}m left`;
+  return `${minutes}m left`;
 }
 
 function SkeletonUsers() {
   return (
-    <div className="max-w-5xl page-enter">
+    <div className="max-w-6xl page-enter">
       <div className="flex items-center justify-between mb-6">
         <div>
           <div className="skeleton skeleton-title w-32" />
@@ -44,6 +79,8 @@ export default function UsersPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
+  const [search, setSearch] = useState("");
+  const [roleFilter, setRoleFilter] = useState<"all" | "ADMIN" | "USER">("all");
   const [newUser, setNewUser] = useState({
     name: "",
     email: "",
@@ -51,6 +88,8 @@ export default function UsersPage() {
     role: "USER",
   });
   const [createError, setCreateError] = useState("");
+  const [grantingTempId, setGrantingTempId] = useState<string | null>(null);
+  const { toast } = useToast();
 
   useEffect(() => {
     fetchUsers();
@@ -66,13 +105,51 @@ export default function UsersPage() {
       .catch(() => setLoading(false));
   }
 
-  async function handleRoleChange(userId: string, newRole: string) {
-    await fetch("/api/users", {
+  async function handleRoleChange(userId: string, userName: string | null, newRole: string) {
+    const res = await fetch("/api/users", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ userId, role: newRole }),
     });
-    fetchUsers();
+    if (res.ok) {
+      toast({
+        title: `${userName || "User"} ${newRole === "ADMIN" ? "promoted to Admin" : "set to User"}`,
+        variant: "success",
+      });
+      fetchUsers();
+    } else {
+      toast({ title: "Failed to update role", variant: "error" });
+    }
+  }
+
+  async function handleGrantTempAdmin(userId: string, hours: number) {
+    const res = await fetch("/api/users/temp-admin", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId, hours }),
+    });
+    if (res.ok) {
+      toast({ title: `Temp admin granted for ${hours}h`, variant: "success" });
+      setGrantingTempId(null);
+      fetchUsers();
+    } else {
+      const data = await res.json();
+      toast({ title: data.error || "Failed to grant temp admin", variant: "error" });
+    }
+  }
+
+  async function handleRevokeTempAdmin(userId: string) {
+    const res = await fetch("/api/users/temp-admin", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId }),
+    });
+    if (res.ok) {
+      toast({ title: "Temp admin revoked", variant: "success" });
+      fetchUsers();
+    } else {
+      toast({ title: "Failed to revoke temp admin", variant: "error" });
+    }
   }
 
   async function handleCreateUser(e: React.FormEvent) {
@@ -91,6 +168,7 @@ export default function UsersPage() {
       return;
     }
 
+    toast({ title: `User "${newUser.name}" created`, variant: "success" });
     setShowCreate(false);
     setNewUser({ name: "", email: "", password: "", role: "USER" });
     fetchUsers();
@@ -100,115 +178,220 @@ export default function UsersPage() {
     return <SkeletonUsers />;
   }
 
-  return (
-    <div className="max-w-5xl page-enter">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">Users</h2>
-          <p className="text-gray-500 mt-1">
-            Manage user accounts and roles.
-          </p>
-        </div>
-        <button
-          onClick={() => setShowCreate(!showCreate)}
-          className="px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 shadow-sm shadow-blue-200/50 flex items-center gap-2"
-        >
-          {showCreate ? (
-            <>
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-              Cancel
-            </>
-          ) : (
-            <>
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-              </svg>
-              Add User
-            </>
-          )}
-        </button>
-      </div>
+  // Filter logic
+  const filtered = users.filter((user) => {
+    const matchesSearch =
+      !search ||
+      user.name?.toLowerCase().includes(search.toLowerCase()) ||
+      user.email.toLowerCase().includes(search.toLowerCase());
+    const matchesRole = roleFilter === "all" || user.role === roleFilter;
+    return matchesSearch && matchesRole;
+  });
 
+  const adminCount = users.filter((u) => u.role === "ADMIN").length;
+  const userCount = users.filter((u) => u.role === "USER").length;
+
+  const roleTabs = [
+    { key: "all" as const, label: "All Users", count: users.length },
+    { key: "ADMIN" as const, label: "Admins", count: adminCount },
+    { key: "USER" as const, label: "Users", count: userCount },
+  ];
+
+  function renderTempAdminControls(user: User) {
+    const isTempAdmin = user.role === "ADMIN" && !!user.tempAdminUntil;
+    const isPermanentAdmin = user.role === "ADMIN" && !user.tempAdminUntil;
+
+    // Show temp admin badge + revoke for active temp admins
+    if (isTempAdmin) {
+      return (
+        <div className="flex items-center gap-2">
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-100 text-amber-700">
+            <Clock className="w-3 h-3" />
+            TEMP {formatTimeRemaining(user.tempAdminUntil!)}
+          </span>
+          <button
+            onClick={() => handleRevokeTempAdmin(user.id)}
+            className="text-sm text-red-600 hover:text-red-800 font-medium flex items-center gap-1 cursor-pointer"
+          >
+            <ShieldOff className="w-3.5 h-3.5" />
+            Revoke
+          </button>
+        </div>
+      );
+    }
+
+    // Show temp admin grant UI for regular users
+    if (user.role === "USER") {
+      if (grantingTempId === user.id) {
+        return (
+          <div className="flex items-center gap-1.5">
+            {TEMP_DURATIONS.map((d) => (
+              <button
+                key={d.hours}
+                onClick={() => handleGrantTempAdmin(user.id, d.hours)}
+                className="px-2 py-0.5 text-[11px] font-semibold rounded-md bg-purple-50 text-purple-700 hover:bg-purple-100 cursor-pointer transition-colors"
+              >
+                {d.label}
+              </button>
+            ))}
+            <button
+              onClick={() => setGrantingTempId(null)}
+              className="p-0.5 text-gray-400 hover:text-gray-600 cursor-pointer"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        );
+      }
+      return (
+        <button
+          onClick={() => setGrantingTempId(user.id)}
+          className="text-sm text-purple-600 hover:text-purple-800 font-medium flex items-center gap-1 cursor-pointer"
+        >
+          <Shield className="w-3.5 h-3.5" />
+          Temp Admin
+        </button>
+      );
+    }
+
+    // Permanent admins — no temp admin option
+    return null;
+  }
+
+  function renderTempAdminControlsMobile(user: User) {
+    const isTempAdmin = user.role === "ADMIN" && !!user.tempAdminUntil;
+
+    if (isTempAdmin) {
+      return (
+        <div className="flex items-center gap-2">
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-100 text-amber-700">
+            <Clock className="w-2.5 h-2.5" />
+            TEMP {formatTimeRemaining(user.tempAdminUntil!)}
+          </span>
+          <button
+            onClick={() => handleRevokeTempAdmin(user.id)}
+            className="text-xs text-red-600 font-medium flex items-center gap-1 cursor-pointer"
+          >
+            <ShieldOff className="w-3 h-3" />
+            Revoke
+          </button>
+        </div>
+      );
+    }
+
+    if (user.role === "USER") {
+      if (grantingTempId === user.id) {
+        return (
+          <div className="flex items-center gap-1 mt-2">
+            {TEMP_DURATIONS.map((d) => (
+              <button
+                key={d.hours}
+                onClick={() => handleGrantTempAdmin(user.id, d.hours)}
+                className="px-2 py-0.5 text-[10px] font-semibold rounded-md bg-purple-50 text-purple-700 hover:bg-purple-100 cursor-pointer transition-colors"
+              >
+                {d.label}
+              </button>
+            ))}
+            <button
+              onClick={() => setGrantingTempId(null)}
+              className="p-0.5 text-gray-400 hover:text-gray-600 cursor-pointer"
+            >
+              <X className="w-3 h-3" />
+            </button>
+          </div>
+        );
+      }
+      return (
+        <button
+          onClick={() => setGrantingTempId(user.id)}
+          className="text-xs text-purple-600 font-medium flex items-center gap-1 cursor-pointer"
+        >
+          <Shield className="w-3 h-3" />
+          Temp
+        </button>
+      );
+    }
+
+    return null;
+  }
+
+  return (
+    <div className="max-w-6xl page-enter">
+      <PageHeader
+        title="Users"
+        description="Manage user accounts and roles."
+        badge={{ label: "TEAM", icon: Users }}
+        count={users.length}
+        actions={
+          <button
+            onClick={() => setShowCreate(!showCreate)}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 shadow-sm shadow-blue-200/50 cursor-pointer transition-colors"
+          >
+            {showCreate ? <X className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+            {showCreate ? "Cancel" : "Add User"}
+          </button>
+        }
+      />
+
+      {/* Create User Form */}
       {showCreate && (
         <div className="mb-6 p-6 bg-white rounded-xl shadow-sm border border-gray-200 animate-fade-in-up">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">
-            Create New User
-          </h3>
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Create New User</h3>
           {createError && (
             <div className="mb-4 px-4 py-3 bg-red-50 border border-red-100 text-red-700 rounded-xl text-sm flex items-center gap-2 animate-slide-in">
-              <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
-              </svg>
+              <AlertCircle className="w-4 h-4 flex-shrink-0" />
               {createError}
             </div>
           )}
-          <form onSubmit={handleCreateUser} className="grid grid-cols-2 gap-4">
+          <form onSubmit={handleCreateUser} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                Name
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Name</label>
               <input
                 type="text"
                 required
                 value={newUser.name}
-                onChange={(e) =>
-                  setNewUser({ ...newUser, name: e.target.value })
-                }
+                onChange={(e) => setNewUser({ ...newUser, name: e.target.value })}
                 className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
                 placeholder="Full name"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                Email
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Email</label>
               <input
                 type="email"
                 required
                 value={newUser.email}
-                onChange={(e) =>
-                  setNewUser({ ...newUser, email: e.target.value })
-                }
+                onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
                 className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
                 placeholder="user@example.com"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                Password
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Password</label>
               <input
                 type="password"
                 required
                 value={newUser.password}
-                onChange={(e) =>
-                  setNewUser({ ...newUser, password: e.target.value })
-                }
+                onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
                 className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
                 placeholder="Min. 6 characters"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                Role
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Role</label>
               <select
                 value={newUser.role}
-                onChange={(e) =>
-                  setNewUser({ ...newUser, role: e.target.value })
-                }
+                onChange={(e) => setNewUser({ ...newUser, role: e.target.value })}
                 className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
               >
                 <option value="USER">User</option>
                 <option value="ADMIN">Admin</option>
               </select>
             </div>
-            <div className="col-span-2">
+            <div className="sm:col-span-2">
               <button
                 type="submit"
-                className="px-5 py-2.5 bg-blue-600 text-white text-sm font-semibold rounded-xl hover:bg-blue-700 shadow-sm shadow-blue-200/50"
+                className="px-5 py-2.5 bg-blue-600 text-white text-sm font-semibold rounded-xl hover:bg-blue-700 shadow-sm shadow-blue-200/50 cursor-pointer transition-colors"
               >
                 Create User
               </button>
@@ -217,103 +400,176 @@ export default function UsersPage() {
         </div>
       )}
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-        <table className="w-full">
-          <thead>
-            <tr className="bg-gray-50/80 border-b border-gray-200">
-              <th className="px-6 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                User
-              </th>
-              <th className="px-6 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                Role
-              </th>
-              <th className="px-6 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                Last Login
-              </th>
-              <th className="px-6 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                Created
-              </th>
-              <th className="px-6 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                Actions
-              </th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100">
-            {users.map((user, i) => (
-              <tr
-                key={user.id}
-                className="table-row-hover row-enter"
-                style={{ animationDelay: `${i * 40}ms` }}
-              >
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center flex-shrink-0">
-                      <span className="text-xs font-semibold text-gray-600">
-                        {(user.name || user.email)[0].toUpperCase()}
-                      </span>
-                    </div>
-                    <div>
-                      <div className="text-sm font-medium text-gray-900">
-                        {user.name || "—"}
-                      </div>
-                      <div className="text-xs text-gray-400">{user.email}</div>
-                    </div>
+      {/* Filters */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mb-4">
+        <SearchInput
+          placeholder="Search by name or email..."
+          value={search}
+          onChange={setSearch}
+          className="w-full sm:w-72"
+        />
+        <div className="flex items-center gap-1.5">
+          {roleTabs.map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => setRoleFilter(tab.key)}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
+                roleFilter === tab.key
+                  ? "bg-blue-600 text-white"
+                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+              }`}
+            >
+              {tab.label}
+              <span className={`px-1.5 py-0.5 rounded-md text-[10px] ${
+                roleFilter === tab.key ? "bg-blue-500 text-white" : "bg-gray-200 text-gray-500"
+              }`}>
+                {tab.count}
+              </span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Desktop Table */}
+      <div className="hidden md:block">
+        <DataTable
+          isEmpty={filtered.length === 0}
+          empty={
+            <div>
+              <Users className="w-10 h-10 text-gray-300 mx-auto mb-3" />
+              <p className="text-sm text-gray-400">
+                {search ? "No users match your search." : "No users found."}
+              </p>
+            </div>
+          }
+          headers={
+            <>
+              <th className="px-6 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">User</th>
+              <th className="px-6 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Role</th>
+              <th className="px-6 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Last Login</th>
+              <th className="px-6 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Created</th>
+              <th className="px-6 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Actions</th>
+            </>
+          }
+        >
+          {filtered.map((user, i) => (
+            <tr
+              key={user.id}
+              className="table-row-hover row-enter"
+              style={{ animationDelay: `${i * 40}ms` }}
+            >
+              <td className="px-6 py-4 whitespace-nowrap">
+                <div className="flex items-center gap-3">
+                  <Avatar name={user.name} email={user.email} size="sm" />
+                  <div>
+                    <div className="text-sm font-medium text-gray-900">{user.name || "\u2014"}</div>
+                    <div className="text-xs text-gray-400">{user.email}</div>
                   </div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <span
-                    className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${
-                      user.role === "ADMIN"
-                        ? "bg-purple-100 text-purple-700"
-                        : "bg-gray-100 text-gray-600"
-                    }`}
+                </div>
+              </td>
+              <td className="px-6 py-4 whitespace-nowrap">
+                <div className="flex items-center gap-2">
+                  <StatusBadge status={user.role} />
+                  {user.tempAdminUntil && user.role === "ADMIN" && (
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-amber-100 text-amber-700">
+                      <Clock className="w-2.5 h-2.5" />
+                      TEMP
+                    </span>
+                  )}
+                </div>
+              </td>
+              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                {user.lastLogin ? timeAgo(user.lastLogin) : <span className="text-gray-300">Never</span>}
+              </td>
+              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                {new Date(user.createdAt).toLocaleDateString()}
+              </td>
+              <td className="px-6 py-4 whitespace-nowrap">
+                <div className="flex items-center gap-3">
+                  <Link
+                    href={`/admin/users/${user.id}`}
+                    className="text-sm text-gray-500 hover:text-gray-800 font-medium flex items-center gap-1 cursor-pointer"
                   >
-                    {user.role}
-                  </span>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  {user.lastLogin
-                    ? new Date(user.lastLogin).toLocaleString()
-                    : <span className="text-gray-300">Never</span>}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  {new Date(user.createdAt).toLocaleDateString()}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="flex items-center gap-3">
-                    <Link
-                      href={`/admin/users/${user.id}`}
-                      className="text-sm text-gray-500 hover:text-gray-800 font-medium flex items-center gap-1"
-                    >
-                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" />
-                      </svg>
-                      Stats
-                    </Link>
+                    <BarChart3 className="w-3.5 h-3.5" />
+                    Stats
+                  </Link>
+                  {renderTempAdminControls(user)}
+                  {/* Permanent role change — hide if currently granting temp or user is temp admin */}
+                  {grantingTempId !== user.id && !(user.role === "ADMIN" && user.tempAdminUntil) && (
                     <button
-                      onClick={() =>
-                        handleRoleChange(
-                          user.id,
-                          user.role === "ADMIN" ? "USER" : "ADMIN"
-                        )
-                      }
-                      className={`text-sm font-medium flex items-center gap-1 ${
+                      onClick={() => handleRoleChange(user.id, user.name, user.role === "ADMIN" ? "USER" : "ADMIN")}
+                      className={`text-sm font-medium flex items-center gap-1 cursor-pointer ${
                         user.role === "ADMIN"
                           ? "text-orange-600 hover:text-orange-800"
                           : "text-blue-600 hover:text-blue-800"
                       }`}
                     >
-                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 21L3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5" />
-                      </svg>
+                      <ArrowUpDown className="w-3.5 h-3.5" />
                       {user.role === "ADMIN" ? "Demote" : "Promote"}
                     </button>
+                  )}
+                </div>
+              </td>
+            </tr>
+          ))}
+        </DataTable>
+      </div>
+
+      {/* Mobile Card View */}
+      <div className="md:hidden space-y-3">
+        {filtered.length === 0 ? (
+          <div className="bg-white rounded-xl border border-gray-200 p-8 text-center">
+            <Users className="w-10 h-10 text-gray-300 mx-auto mb-3" />
+            <p className="text-sm text-gray-400">
+              {search ? "No users match your search." : "No users found."}
+            </p>
+          </div>
+        ) : (
+          filtered.map((user, i) => (
+            <div
+              key={user.id}
+              className="bg-white rounded-xl border border-gray-200 p-4 card-enter hover-lift"
+              style={{ animationDelay: `${i * 50}ms` }}
+            >
+              <div className="flex items-start justify-between">
+                <div className="flex items-center gap-3">
+                  <Avatar name={user.name} email={user.email} size="md" />
+                  <div>
+                    <div className="text-sm font-medium text-gray-900">{user.name || "\u2014"}</div>
+                    <div className="text-xs text-gray-400">{user.email}</div>
                   </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                </div>
+                <StatusBadge status={user.role} />
+              </div>
+              <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-100">
+                <div className="text-xs text-gray-500">
+                  {user.lastLogin ? `Last login ${timeAgo(user.lastLogin)}` : "Never logged in"}
+                </div>
+                <div className="flex items-center gap-3">
+                  <Link
+                    href={`/admin/users/${user.id}`}
+                    className="text-xs text-gray-500 hover:text-gray-800 font-medium flex items-center gap-1 cursor-pointer"
+                  >
+                    <BarChart3 className="w-3 h-3" />
+                    Stats
+                  </Link>
+                  {renderTempAdminControlsMobile(user)}
+                  {grantingTempId !== user.id && !(user.role === "ADMIN" && user.tempAdminUntil) && (
+                    <button
+                      onClick={() => handleRoleChange(user.id, user.name, user.role === "ADMIN" ? "USER" : "ADMIN")}
+                      className={`text-xs font-medium flex items-center gap-1 cursor-pointer ${
+                        user.role === "ADMIN" ? "text-orange-600" : "text-blue-600"
+                      }`}
+                    >
+                      <ArrowUpDown className="w-3 h-3" />
+                      {user.role === "ADMIN" ? "Demote" : "Promote"}
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))
+        )}
       </div>
     </div>
   );
