@@ -7,11 +7,12 @@ import {
   Plus,
   X,
   BarChart3,
-  ArrowUpDown,
   AlertCircle,
   Clock,
   Shield,
   ShieldOff,
+  ShieldCheck,
+  Crown,
 } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { DataTable } from "@/components/ui/data-table";
@@ -89,6 +90,7 @@ export default function UsersPage() {
   });
   const [createError, setCreateError] = useState("");
   const [grantingTempId, setGrantingTempId] = useState<string | null>(null);
+  const [confirmingPromoteId, setConfirmingPromoteId] = useState<string | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -113,12 +115,16 @@ export default function UsersPage() {
     });
     if (res.ok) {
       toast({
-        title: `${userName || "User"} ${newRole === "ADMIN" ? "promoted to Admin" : "set to User"}`,
+        title: newRole === "ADMIN"
+          ? `${userName || "User"} is now a Full Admin with complete access`
+          : `${userName || "User"} demoted to regular User`,
         variant: "success",
       });
+      setConfirmingPromoteId(null);
       fetchUsers();
     } else {
-      toast({ title: "Failed to update role", variant: "error" });
+      const data = await res.json().catch(() => null);
+      toast({ title: data?.error || "Failed to update role", variant: "error" });
     }
   }
 
@@ -384,16 +390,31 @@ export default function UsersPage() {
                 onChange={(e) => setNewUser({ ...newUser, role: e.target.value })}
                 className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
               >
-                <option value="USER">User</option>
-                <option value="ADMIN">Admin</option>
+                <option value="USER">User (standard access)</option>
+                <option value="ADMIN">Admin (full access)</option>
               </select>
             </div>
+            {newUser.role === "ADMIN" && (
+              <div className="sm:col-span-2 flex items-start gap-3 px-4 py-3 bg-blue-50/60 backdrop-blur-sm border border-blue-200/50 rounded-xl animate-fade-in-up">
+                <ShieldCheck className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-semibold text-blue-900">Full Admin Access</p>
+                  <p className="text-xs text-blue-700 mt-0.5">
+                    This user will have the same permissions as you: manage users, projects, schedules, view all activity, and approve access requests. This is permanent until manually revoked.
+                  </p>
+                </div>
+              </div>
+            )}
             <div className="sm:col-span-2">
               <button
                 type="submit"
-                className="px-5 py-2.5 bg-blue-600 text-white text-sm font-semibold rounded-xl hover:bg-blue-700 shadow-sm shadow-blue-200/50 cursor-pointer transition-colors"
+                className={`px-5 py-2.5 text-white text-sm font-semibold rounded-xl shadow-sm cursor-pointer transition-colors ${
+                  newUser.role === "ADMIN"
+                    ? "bg-indigo-600 hover:bg-indigo-700 shadow-indigo-200/50"
+                    : "bg-blue-600 hover:bg-blue-700 shadow-blue-200/50"
+                }`}
               >
-                Create User
+                {newUser.role === "ADMIN" ? "Create Admin" : "Create User"}
               </button>
             </div>
           </form>
@@ -470,10 +491,16 @@ export default function UsersPage() {
               <td className="px-6 py-4 whitespace-nowrap">
                 <div className="flex items-center gap-2">
                   <StatusBadge status={user.role} />
-                  {user.tempAdminUntil && user.role === "ADMIN" && (
+                  {user.role === "ADMIN" && user.tempAdminUntil && (
                     <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-amber-100 text-amber-700">
                       <Clock className="w-2.5 h-2.5" />
                       TEMP
+                    </span>
+                  )}
+                  {user.role === "ADMIN" && !user.tempAdminUntil && (
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-indigo-100 text-indigo-700">
+                      <Crown className="w-2.5 h-2.5" />
+                      FULL
                     </span>
                   )}
                 </div>
@@ -496,17 +523,52 @@ export default function UsersPage() {
                   {renderTempAdminControls(user)}
                   {/* Permanent role change — hide if currently granting temp or user is temp admin */}
                   {grantingTempId !== user.id && !(user.role === "ADMIN" && user.tempAdminUntil) && (
-                    <button
-                      onClick={() => handleRoleChange(user.id, user.name, user.role === "ADMIN" ? "USER" : "ADMIN")}
-                      className={`text-sm font-medium flex items-center gap-1 cursor-pointer ${
-                        user.role === "ADMIN"
-                          ? "text-orange-600 hover:text-orange-800"
-                          : "text-blue-600 hover:text-blue-800"
-                      }`}
-                    >
-                      <ArrowUpDown className="w-3.5 h-3.5" />
-                      {user.role === "ADMIN" ? "Demote" : "Promote"}
-                    </button>
+                    <>
+                      {confirmingPromoteId === user.id ? (
+                        <div className="flex items-center gap-2 animate-fade-in-up">
+                          <span className="text-xs text-gray-500">
+                            {user.role === "USER" ? "Grant full admin access?" : "Remove admin access?"}
+                          </span>
+                          <button
+                            onClick={() => handleRoleChange(user.id, user.name, user.role === "ADMIN" ? "USER" : "ADMIN")}
+                            className={`px-2.5 py-1 text-xs font-semibold rounded-lg cursor-pointer transition-colors ${
+                              user.role === "USER"
+                                ? "bg-indigo-600 text-white hover:bg-indigo-700"
+                                : "bg-orange-600 text-white hover:bg-orange-700"
+                            }`}
+                          >
+                            Confirm
+                          </button>
+                          <button
+                            onClick={() => setConfirmingPromoteId(null)}
+                            className="p-0.5 text-gray-400 hover:text-gray-600 cursor-pointer"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => setConfirmingPromoteId(user.id)}
+                          className={`text-sm font-medium flex items-center gap-1 cursor-pointer ${
+                            user.role === "ADMIN"
+                              ? "text-orange-600 hover:text-orange-800"
+                              : "text-indigo-600 hover:text-indigo-800"
+                          }`}
+                        >
+                          {user.role === "ADMIN" ? (
+                            <>
+                              <ShieldOff className="w-3.5 h-3.5" />
+                              Demote
+                            </>
+                          ) : (
+                            <>
+                              <ShieldCheck className="w-3.5 h-3.5" />
+                              Make Admin
+                            </>
+                          )}
+                        </button>
+                      )}
+                    </>
                   )}
                 </div>
               </td>
@@ -555,15 +617,47 @@ export default function UsersPage() {
                   </Link>
                   {renderTempAdminControlsMobile(user)}
                   {grantingTempId !== user.id && !(user.role === "ADMIN" && user.tempAdminUntil) && (
-                    <button
-                      onClick={() => handleRoleChange(user.id, user.name, user.role === "ADMIN" ? "USER" : "ADMIN")}
-                      className={`text-xs font-medium flex items-center gap-1 cursor-pointer ${
-                        user.role === "ADMIN" ? "text-orange-600" : "text-blue-600"
-                      }`}
-                    >
-                      <ArrowUpDown className="w-3 h-3" />
-                      {user.role === "ADMIN" ? "Demote" : "Promote"}
-                    </button>
+                    <>
+                      {confirmingPromoteId === user.id ? (
+                        <div className="flex items-center gap-1.5 animate-fade-in-up">
+                          <button
+                            onClick={() => handleRoleChange(user.id, user.name, user.role === "ADMIN" ? "USER" : "ADMIN")}
+                            className={`px-2 py-0.5 text-[10px] font-semibold rounded-md cursor-pointer transition-colors ${
+                              user.role === "USER"
+                                ? "bg-indigo-600 text-white"
+                                : "bg-orange-600 text-white"
+                            }`}
+                          >
+                            Confirm
+                          </button>
+                          <button
+                            onClick={() => setConfirmingPromoteId(null)}
+                            className="p-0.5 text-gray-400 hover:text-gray-600 cursor-pointer"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => setConfirmingPromoteId(user.id)}
+                          className={`text-xs font-medium flex items-center gap-1 cursor-pointer ${
+                            user.role === "ADMIN" ? "text-orange-600" : "text-indigo-600"
+                          }`}
+                        >
+                          {user.role === "ADMIN" ? (
+                            <>
+                              <ShieldOff className="w-3 h-3" />
+                              Demote
+                            </>
+                          ) : (
+                            <>
+                              <ShieldCheck className="w-3 h-3" />
+                              Admin
+                            </>
+                          )}
+                        </button>
+                      )}
+                    </>
                   )}
                 </div>
               </div>
