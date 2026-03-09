@@ -41,6 +41,7 @@ export default function UserLayout({
     nextAvailable?: string;
   } | null>(null);
 
+  // Check schedule and session validity on mount
   useEffect(() => {
     fetch("/api/schedule/check")
       .then((r) => r.json())
@@ -55,13 +56,14 @@ export default function UserLayout({
       .then((r) => r.json())
       .then((data) => {
         if (!data.valid) {
-          signOut({ callbackUrl: "/login" });
+          signOut({ callbackUrl: "/login?reason=session_expired" });
         }
       });
   }, [router]);
 
+  // Periodic checks: schedule every 60s, session every 30s for faster expiry detection
   useEffect(() => {
-    const interval = setInterval(() => {
+    const scheduleInterval = setInterval(() => {
       fetch("/api/schedule/check")
         .then((r) => r.json())
         .then((data) => {
@@ -69,17 +71,42 @@ export default function UserLayout({
             router.push("/unavailable");
           }
         });
+    }, 60000);
 
+    const sessionInterval = setInterval(() => {
       fetch("/api/session/check")
         .then((r) => r.json())
         .then((data) => {
           if (!data.valid) {
-            signOut({ callbackUrl: "/login" });
+            signOut({ callbackUrl: "/login?reason=session_expired" });
           }
         });
-    }, 60000);
-    return () => clearInterval(interval);
+    }, 30000);
+
+    return () => {
+      clearInterval(scheduleInterval);
+      clearInterval(sessionInterval);
+    };
   }, [router]);
+
+  // Auto sign-out when the session hard-expires (client-side timer based on expiresAt)
+  useEffect(() => {
+    if (status !== "authenticated" || !session?.expiresAt) return;
+
+    const expiresAt = new Date(session.expiresAt).getTime();
+    const remaining = expiresAt - Date.now();
+
+    if (remaining <= 0) {
+      signOut({ callbackUrl: "/login?reason=session_expired" });
+      return;
+    }
+
+    const timeout = setTimeout(() => {
+      signOut({ callbackUrl: "/login?reason=session_expired" });
+    }, remaining);
+
+    return () => clearTimeout(timeout);
+  }, [session?.expiresAt, status]);
 
   if (status === "loading") {
     return (

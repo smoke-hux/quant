@@ -9,10 +9,7 @@ export const GET = withAuth(
       return NextResponse.json({ valid: false, reason: "not_authenticated" });
     }
 
-    if (session.user.role === "ADMIN") {
-      return NextResponse.json({ valid: true });
-    }
-
+    // Session expired or revoked (caught by jwt callback's DB check)
     if (session.sessionExpired) {
       const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000);
       const recentLogout = await prisma.activityLog.findFirst({
@@ -29,7 +26,7 @@ export const GET = withAuth(
           data: {
             userId: session.user.id,
             action: "LOGOUT",
-            details: "Session expired (2-hour limit)",
+            details: "Session expired or revoked",
           },
         });
       }
@@ -37,6 +34,10 @@ export const GET = withAuth(
       return NextResponse.json({ valid: false, reason: "session_expired" });
     }
 
-    return NextResponse.json({ valid: true });
+    return NextResponse.json({
+      valid: true,
+      expiresAt: session.expiresAt,
+      role: session.user.role,
+    });
   }
 );

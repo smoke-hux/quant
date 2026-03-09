@@ -36,10 +36,7 @@ export function withAuth(
   const authLevel = config.auth ?? "user";
 
   return async (req: Request, ctx?: any) => {
-    // 1. Rate limiting — use x-forwarded-for only when behind a proxy,
-    //    fallback to a shared bucket instead of trusting client headers blindly.
-    //    The rightmost x-forwarded-for entry before our proxy is more trustworthy
-    //    than the leftmost (which is client-supplied).
+    // 1. Rate limiting
     const forwardedFor = req.headers.get("x-forwarded-for");
     const ip =
       req.headers.get("x-real-ip") ||
@@ -103,7 +100,6 @@ export function withAuth(
           );
         }
       } else {
-        // No origin header — reject unless in dev mode
         if (!isDev) {
           return NextResponse.json(
             { error: "CSRF check failed" },
@@ -124,8 +120,8 @@ export function withAuth(
         );
       }
 
-      // Enforce server-side session expiry for non-admin users
-      if (session.sessionExpired && session.user.role !== "ADMIN") {
+      // Reject expired or revoked sessions
+      if (session.sessionExpired) {
         return NextResponse.json(
           { error: "Session expired" },
           { status: 401 }

@@ -21,7 +21,11 @@ function AuthPageInner() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [error, setError] = useState("");
+  const [error, setError] = useState(
+    searchParams.get("reason") === "session_expired"
+      ? "Your session has expired. Please sign in again."
+      : ""
+  );
   const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);

@@ -1,40 +1,6 @@
-import type { NextAuthConfig } from "next-auth";
+// Shared auth constants.
+// Main auth config is in auth.ts (JWT + PrismaAdapter + DB session tracking).
+// Middleware is a custom cookie check in middleware.ts.
 
-// Edge-compatible auth config (no Node.js-specific imports like bcrypt/prisma)
-// Only contains config that is safe to run in Edge Runtime (middleware)
-export const authConfig = {
-  pages: {
-    signIn: "/login",
-  },
-  callbacks: {
-    authorized({ auth, request: { nextUrl } }: { auth: any; request: { nextUrl: URL } }) {
-      const isLoggedIn = !!auth?.user;
-      const pathname = nextUrl.pathname;
-
-      // Public routes — always allow
-      if (
-        pathname === "/" ||
-        pathname === "/login" ||
-        pathname === "/unavailable" ||
-        pathname.startsWith("/api/auth") ||
-        pathname === "/api/schedule/check" ||
-        pathname === "/api/session/check"
-      ) {
-        return true;
-      }
-
-      // Not authenticated → middleware will redirect to signIn page
-      if (!isLoggedIn) {
-        return false;
-      }
-
-      // Admin routes require ADMIN role
-      if (pathname.startsWith("/admin") && auth?.user?.role !== "ADMIN") {
-        return Response.redirect(new URL("/user/projects", nextUrl));
-      }
-
-      return true;
-    },
-  },
-  providers: [], // Added in auth.ts (server-only)
-} satisfies NextAuthConfig;
+export const USER_SESSION_MAX_AGE_S = 2 * 60 * 60; // 2 hours
+export const ADMIN_SESSION_MAX_AGE_S = 8 * 60 * 60; // 8 hours

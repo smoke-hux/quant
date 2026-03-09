@@ -1,14 +1,22 @@
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import Google from "next-auth/providers/google";
+import { PrismaAdapter } from "@auth/prisma-adapter";
 import bcrypt from "bcryptjs";
+import crypto from "crypto";
 import { prisma } from "./prisma";
-import { authConfig } from "./auth.config";
 
 // Dummy hash for constant-time comparison when user doesn't exist (prevents timing attacks)
 const DUMMY_HASH = "$2a$10$abcdefghijklmnopqrstuuABCDEFGHIJKLMNOPQRSTUVWXYZ012";
 
-// Build providers list — only include Google if credentials are configured
+// --- Session lifetime constants ---
+const USER_SESSION_MAX_AGE_MS = 2 * 60 * 60 * 1000; // 2 hours
+const ADMIN_SESSION_MAX_AGE_MS = 8 * 60 * 60 * 1000; // 8 hours
+const COOKIE_MAX_AGE_S = 8 * 60 * 60; // 8 hours (upper bound)
+// How often to re-validate the session against the DB
+const SESSION_REVALIDATE_MS = 5 * 60 * 1000; // 5 minutes
+
+// Build providers list
 const providers: any[] = [
   Credentials({
     name: "credentials",
@@ -57,27 +65,45 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
 }
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
-  ...authConfig,
-  // Only trust host header in development; in production, set NEXTAUTH_URL
+  // PrismaAdapter handles OAuth account management (Google linking).
+  // Sessions use JWT strategy (required for Credentials provider) but are
+  // also tracked in the DB Session table for admin revocation support.
+  adapter: PrismaAdapter(prisma) as any,
   trustHost: process.env.NODE_ENV === "development",
   providers,
+  pages: {
+    signIn: "/login",
+  },
   session: {
+    // JWT strategy — required because Credentials provider doesn't support database sessions.
+    // We add our own DB session tracking on top for revocation and visibility.
     strategy: "jwt",
+    maxAge: COOKIE_MAX_AGE_S,
+    updateAge: 5 * 60, // 5-minute sliding window
+  },
+  cookies: {
+    sessionToken: {
+      name:
+        process.env.NODE_ENV === "production"
+          ? "__Secure-authjs.session-token"
+          : "authjs.session-token",
+      options: {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        secure: process.env.NODE_ENV === "production",
+      },
+    },
   },
   callbacks: {
-    ...authConfig.callbacks,
     async signIn({ user, account }) {
-      // Reject OAuth users without an email
-      if (!user.email) {
-        return false;
-      }
+      if (!user.email) return false;
 
       try {
         if (account?.provider === "google") {
           const existingUser = await prisma.user.findUnique({
             where: { email: user.email },
           });
-
           if (!existingUser) {
             await prisma.user.create({
               data: {
@@ -95,25 +121,22 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         });
         if (dbUser) {
           await prisma.activityLog.create({
-            data: {
-              userId: dbUser.id,
-              action: "LOGIN",
-            },
+            data: { userId: dbUser.id, action: "LOGIN" },
           });
         }
       } catch (e) {
         console.error("Error in signIn callback:", e);
-        // Block sign-in if we can't verify/create the user in the database
         return false;
       }
 
       return true;
     },
-    async jwt({ token, user }) {
+
+    async jwt({ token, user, trigger }) {
+      const now = Date.now();
+
+      // --- Initial sign-in: populate token + create DB session record ---
       if (user) {
-        // On initial sign-in, user object is available
-        // For credentials provider, role comes from authorize() return
-        // For OAuth, we need to look it up
         if (user.role) {
           token.role = user.role;
           token.id = user.id;
@@ -126,52 +149,114 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             token.id = dbUser.id;
           }
         }
-        // Set session start time on initial sign-in
-        token.sessionStart = Date.now();
+
+        const maxAgeMs =
+          token.role === "ADMIN"
+            ? ADMIN_SESSION_MAX_AGE_MS
+            : USER_SESSION_MAX_AGE_MS;
+
+        // Create a tracked session in the DB for admin visibility / revocation
+        const sessionToken = crypto.randomUUID();
+        await prisma.session.create({
+          data: {
+            sessionToken,
+            userId: token.id as string,
+            expires: new Date(now + maxAgeMs),
+          },
+        });
+
+        token.sessionToken = sessionToken;
+        token.sessionStart = now;
+        token.lastChecked = now;
         token.expired = false;
+        return token;
       }
 
-      // Check temp admin expiry and sync role from DB
-      if (token.id) {
-        const dbUser = await prisma.user.findUnique({
-          where: { id: token.id as string },
-          select: { role: true, tempAdminUntil: true },
-        });
-        if (dbUser) {
-          if (dbUser.tempAdminUntil && new Date(dbUser.tempAdminUntil) < new Date()) {
-            // Temp admin expired — revert to USER
-            await prisma.user.update({
-              where: { id: token.id as string },
-              data: { role: "USER", tempAdminUntil: null },
-            });
-            await prisma.activityLog.create({
-              data: {
-                userId: token.id as string,
-                action: "TEMP_ADMIN_EXPIRED",
-                details: "Temporary admin privileges expired",
-              },
-            });
-            token.role = "USER";
-            token.isTempAdmin = false;
-          } else {
-            token.role = dbUser.role;
-            token.isTempAdmin = !!dbUser.tempAdminUntil;
+      // --- Absolute session timeout ---
+      if (token.sessionStart) {
+        const maxAge =
+          token.role === "ADMIN"
+            ? ADMIN_SESSION_MAX_AGE_MS
+            : USER_SESSION_MAX_AGE_MS;
+        if (now - (token.sessionStart as number) > maxAge) {
+          token.expired = true;
+          // Clean up DB session
+          if (token.sessionToken) {
+            await prisma.session
+              .deleteMany({ where: { sessionToken: token.sessionToken as string } })
+              .catch(() => {});
           }
+          return token;
         }
       }
 
-      // Check 2-hour session limit for non-admin users
-      const TWO_HOURS = 2 * 60 * 60 * 1000;
-      if (
-        token.role !== "ADMIN" &&
-        token.sessionStart &&
-        Date.now() - (token.sessionStart as number) > TWO_HOURS
-      ) {
-        token.expired = true;
+      // --- Periodic DB revalidation (every 5 minutes) ---
+      // Checks: session not revoked, user still exists, role changes, temp admin expiry
+      const lastChecked = (token.lastChecked as number) || 0;
+      const needsCheck =
+        now - lastChecked > SESSION_REVALIDATE_MS || trigger === "update";
+
+      if (needsCheck && token.id) {
+        // 1. Check if the DB session was revoked by an admin
+        if (token.sessionToken) {
+          const dbSession = await prisma.session.findUnique({
+            where: { sessionToken: token.sessionToken as string },
+          });
+          if (!dbSession || dbSession.expires < new Date()) {
+            // Session revoked or expired in DB → force logout
+            token.expired = true;
+            return token;
+          }
+        }
+
+        // 2. Verify user still exists and sync role
+        const dbUser = await prisma.user.findUnique({
+          where: { id: token.id as string },
+          select: {
+            id: true,
+            email: true,
+            name: true,
+            role: true,
+            tempAdminUntil: true,
+          },
+        });
+
+        if (!dbUser) {
+          token.expired = true;
+          return token;
+        }
+
+        // 3. Handle temp admin expiry
+        if (
+          dbUser.tempAdminUntil &&
+          new Date(dbUser.tempAdminUntil) < new Date()
+        ) {
+          await prisma.user.update({
+            where: { id: dbUser.id },
+            data: { role: "USER", tempAdminUntil: null },
+          });
+          await prisma.activityLog.create({
+            data: {
+              userId: dbUser.id,
+              action: "TEMP_ADMIN_EXPIRED",
+              details: "Temporary admin privileges expired",
+            },
+          });
+          token.role = "USER";
+          token.isTempAdmin = false;
+        } else {
+          token.role = dbUser.role;
+          token.isTempAdmin = !!dbUser.tempAdminUntil;
+        }
+
+        token.email = dbUser.email;
+        token.name = dbUser.name;
+        token.lastChecked = now;
       }
 
       return token;
     },
+
     async session({ session, token }) {
       if (session.user) {
         session.user.role = token.role as string;
@@ -179,7 +264,41 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         session.user.isTempAdmin = token.isTempAdmin === true;
       }
       session.sessionExpired = token.expired === true;
+
+      // Expose expiry timestamp for client-side countdown
+      if (token.sessionStart) {
+        const maxAge =
+          token.role === "ADMIN"
+            ? ADMIN_SESSION_MAX_AGE_MS
+            : USER_SESSION_MAX_AGE_MS;
+        session.expiresAt = new Date(
+          (token.sessionStart as number) + maxAge
+        ).toISOString();
+      }
+
       return session;
+    },
+  },
+  events: {
+    async signOut(message) {
+      // Clean up DB session on sign-out
+      if ("token" in message && message.token) {
+        const tok = message.token as any;
+        if (tok.sessionToken) {
+          await prisma.session
+            .deleteMany({ where: { sessionToken: tok.sessionToken } })
+            .catch(() => {});
+        }
+        if (tok.id) {
+          await prisma.activityLog.create({
+            data: {
+              userId: tok.id,
+              action: "LOGOUT",
+              details: "User signed out",
+            },
+          });
+        }
+      }
     },
   },
 });
