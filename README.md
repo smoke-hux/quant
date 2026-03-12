@@ -18,7 +18,7 @@ npm install
 
 # Set up environment variables
 cp .env.example .env
-# Edit .env with your DATABASE_URL and NEXTAUTH_SECRET
+# Edit .env with your DATABASE_URL, NEXTAUTH_SECRET, and OAuth credentials if needed
 
 # Push database schema
 npm run prisma:push
@@ -37,3 +37,18 @@ npm run dev
 - **Work scheduling** — configurable per-day work hours with admin override capability
 - **Access requests** — users can request access; admins approve/deny
 - **Activity logging** — tracks logins, file uploads, edits, and downloads
+
+## Google OAuth Setup
+
+To enable Google sign-in, add these values to `.env`:
+
+```bash
+GOOGLE_CLIENT_ID=your-google-client-id
+GOOGLE_CLIENT_SECRET=your-google-client-secret
+NEXTAUTH_URL=http://localhost:3000
+```
+
+In the Google Cloud console, configure:
+
+- **Authorized JavaScript origin:** `http://localhost:3000`
+- **Authorized redirect URI:** `http://localhost:3000/api/auth/callback/google`

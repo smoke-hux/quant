@@ -60,6 +60,9 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
     Google({
       clientId: process.env.GOOGLE_CLIENT_ID,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+      // This app treats the Google email as the user's canonical identity.
+      // Enabling linking lets existing password users sign in with Google later.
+      allowDangerousEmailAccountLinking: true,
     })
   );
 }
@@ -69,7 +72,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   // Sessions use JWT strategy (required for Credentials provider) but are
   // also tracked in the DB Session table for admin revocation support.
   adapter: PrismaAdapter(prisma) as any,
-  trustHost: process.env.NODE_ENV === "development",
+  trustHost: true,
   providers,
   pages: {
     signIn: "/login",
@@ -96,33 +99,18 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     },
   },
   callbacks: {
-    async signIn({ user, account }) {
+    async signIn({ user, account, profile }) {
       if (!user.email) return false;
 
       try {
-        if (account?.provider === "google") {
-          const existingUser = await prisma.user.findUnique({
-            where: { email: user.email },
-          });
-          if (!existingUser) {
-            await prisma.user.create({
-              data: {
-                email: user.email,
-                name: user.name,
-                role: "USER",
-              },
-            });
-          }
-        }
-
-        // Log the login activity
-        const dbUser = await prisma.user.findUnique({
-          where: { email: user.email },
-        });
-        if (dbUser) {
-          await prisma.activityLog.create({
-            data: { userId: dbUser.id, action: "LOGIN" },
-          });
+        if (
+          account?.provider === "google" &&
+          typeof profile === "object" &&
+          profile !== null &&
+          "email_verified" in profile &&
+          profile.email_verified === false
+        ) {
+          return false;
         }
       } catch (e) {
         console.error("Error in signIn callback:", e);
@@ -280,6 +268,28 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     },
   },
   events: {
+    async signIn(message) {
+      const email = message.user.email;
+      if (!email) return;
+
+      const dbUser = await prisma.user.findUnique({
+        where: { email },
+        select: { id: true },
+      });
+
+      if (!dbUser) return;
+
+      await prisma.activityLog.create({
+        data: {
+          userId: dbUser.id,
+          action: "LOGIN",
+          details: message.account?.provider
+            ? `Signed in with ${message.account.provider}`
+            : undefined,
+        },
+      });
+    },
+
     async signOut(message) {
       // Clean up DB session on sign-out
       if ("token" in message && message.token) {

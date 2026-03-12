@@ -1,8 +1,30 @@
 "use client";
 
-import { signIn } from "next-auth/react";
-import { Suspense, useState } from "react";
+import { getProviders, signIn } from "next-auth/react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+
+const OAUTH_ERROR_MESSAGES: Record<string, string> = {
+  OAuthSignin: "Google sign-in could not be started. Please try again.",
+  OAuthCallbackError: "Google sign-in did not complete. Please try again.",
+  OAuthCreateAccount: "We couldn't finish creating your Google account.",
+  OAuthAccountNotLinked:
+    "This email is already tied to another sign-in method. Sign in with your password if this keeps happening.",
+  Callback: "Sign-in could not be completed. Please try again.",
+  AccessDenied: "Google sign-in was denied.",
+  Configuration: "Google sign-in is not configured correctly.",
+};
+
+function getInitialError(searchParams: ReturnType<typeof useSearchParams>) {
+  if (searchParams.get("reason") === "session_expired") {
+    return "Your session has expired. Please sign in again.";
+  }
+
+  const authError = searchParams.get("error");
+  if (!authError) return "";
+
+  return OAUTH_ERROR_MESSAGES[authError] ?? "Sign-in failed. Please try again.";
+}
 
 export default function AuthPage() {
   return (
@@ -21,15 +43,47 @@ function AuthPageInner() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [error, setError] = useState(
-    searchParams.get("reason") === "session_expired"
-      ? "Your session has expired. Please sign in again."
-      : ""
-  );
+  const [error, setError] = useState(() => getInitialError(searchParams));
   const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
+  const [googleEnabled, setGoogleEnabled] = useState(false);
+  const [providersLoading, setProvidersLoading] = useState(true);
+  const [oauthLoading, setOauthLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const router = useRouter();
+
+  useEffect(() => {
+    let cancelled = false;
+
+    getProviders()
+      .then((providers) => {
+        if (!cancelled) {
+          setGoogleEnabled(Boolean(providers?.google));
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setGoogleEnabled(false);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setProvidersLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    const initialError = getInitialError(searchParams);
+    if (initialError) {
+      setError(initialError);
+      setSuccess("");
+    }
+  }, [searchParams]);
 
   function switchMode(newMode: "login" | "signup") {
     setMode(newMode);
@@ -153,6 +207,20 @@ function AuthPageInner() {
       setError("Account created but sign-in failed. Please log in manually.");
       setLoading(false);
       switchMode("login");
+    }
+  }
+
+  async function handleGoogleSignIn() {
+    setError("");
+    setSuccess("");
+    setOauthLoading(true);
+
+    try {
+      await signIn("google", { callbackUrl: "/" });
+      setOauthLoading(false);
+    } catch {
+      setError("Google sign-in could not be started. Please try again.");
+      setOauthLoading(false);
     }
   }
 
@@ -598,8 +666,9 @@ function AuthPageInner() {
             {/* Google button */}
             <button
               type="button"
-              onClick={() => signIn("google", { callbackUrl: "/" })}
-              className="w-full flex items-center justify-center gap-3 py-3 px-4 bg-white/60 backdrop-blur-sm border border-white/40 rounded-xl text-sm font-medium text-gray-700 hover:bg-white/80 hover:border-white/50 transition-all duration-200"
+              onClick={handleGoogleSignIn}
+              disabled={providersLoading || oauthLoading || !googleEnabled}
+              className="w-full flex items-center justify-center gap-3 py-3 px-4 bg-white/60 backdrop-blur-sm border border-white/40 rounded-xl text-sm font-medium text-gray-700 hover:bg-white/80 hover:border-white/50 transition-all duration-200 disabled:opacity-60 disabled:cursor-not-allowed"
             >
               <svg className="w-5 h-5" viewBox="0 0 24 24">
                 <path
@@ -619,8 +688,17 @@ function AuthPageInner() {
                   fill="#EA4335"
                 />
               </svg>
-              Continue with Google
+              {oauthLoading
+                ? "Redirecting to Google..."
+                : googleEnabled
+                  ? "Continue with Google"
+                  : "Google sign-in unavailable"}
             </button>
+            {!providersLoading && !googleEnabled && (
+              <p className="text-center text-xs text-gray-500">
+                Google OAuth is not available for this environment.
+              </p>
+            )}
           </form>
 
           {/* Footer */}

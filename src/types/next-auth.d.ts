@@ -3,6 +3,7 @@ import "next-auth";
 declare module "next-auth" {
   interface User {
     role?: string;
+    image?: string | null;
   }
 
   interface Session {
@@ -11,6 +12,7 @@ declare module "next-auth" {
       email: string;
       name: string;
       role: string;
+      image?: string | null;
       isTempAdmin?: boolean;
     };
     /** Whether the session has expired (absolute timeout or revoked) */
